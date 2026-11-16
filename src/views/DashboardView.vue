@@ -1,422 +1,156 @@
 <template>
-  <div class="dashboard-view">
-    <section class="dashboard-command-bar">
-      <div class="dashboard-brand">
-        <img src="/app-icon-384.png" alt="" class="dashboard-brand-mark" />
-        <strong>{{ t('app.name', 'FMO 仪表盘') }}</strong>
-        <div class="mobile-command-stats" aria-label="移动端统计">
-          <span
-            class="command-stat total-today-stat"
-            :title="`${t('header.total', '总通联数量')} / ${t('header.today', '今日通联数量')}`"
-          >
-            <span class="stat-icon" aria-hidden="true">✨</span>
-            {{ totalLogs || totalContactCount }}<small>/{{ todayLogs || todayContactCount }}</small>
-          </span>
-          <span class="command-stat friend-stat" :title="t('header.friends', '好友数量')">
-            <span class="stat-icon" aria-hidden="true">👥</span>
-            {{ uniqueCallsigns }}
-          </span>
-        </div>
-      </div>
-      <div class="connection-strip">
-        <span :class="['status-dot', liveStatusKind || 'ok']"></span>
-        <div class="connection-copy">
-          <strong
-            >{{ activeContact?.callsign || ownCallsign || selectedFromCallsign || 'FMO' }}
-            {{
-              activeContact ? t('header.onAir', '正在通联') : t('header.monitoring', '正在守听')
-            }}</strong
-          >
-        </div>
-        <div class="command-stats">
-          <span
-            class="command-stat total-today-stat"
-            :title="`${t('header.total', '总通联数量')} / ${t('header.today', '今日通联数量')}`"
-          >
-            <span class="stat-icon" aria-hidden="true">✨</span>
-            {{ totalLogs || totalContactCount }}<small>/{{ todayLogs || todayContactCount }}</small>
-          </span>
-          <span class="command-stat friend-stat" :title="t('header.friends', '好友数量')">
-            <span class="stat-icon" aria-hidden="true">👥</span>
-            {{ uniqueCallsigns }}
-          </span>
-        </div>
-      </div>
-      <div class="command-tools">
-        <label class="command-select-wrap" :title="t('header.broadcastMode', '播报模式')">
-          <span class="tool-icon" aria-hidden="true">●</span>
-          <select
-            class="command-select"
-            :value="voiceMode"
-            @change="emit('update-dashboard-voice-mode', $event.target.value)"
-          >
-            <option value="alert">{{ t('header.newCallsignAlert', '新呼号提醒') }}</option>
-            <option value="radio">{{ t('header.contactBroadcast', '通联播报') }}</option>
-            <option value="off">{{ t('header.broadcastOff', '关闭所有播报') }}</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          class="command-tool command-tool-wide"
-          :title="
-            isDarkTheme
-              ? t('header.switchLight', '切换浅色主题')
-              : t('header.switchDark', '切换深色主题')
-          "
-          @click="toggleTheme"
-        >
-          <span class="tool-icon">{{ isDarkTheme ? '☾' : '☀' }}</span>
-          <span
-            >{{ t('header.theme', '主题') }}
-            {{ isDarkTheme ? t('header.dark', '深') : t('header.light', '浅') }}</span
-          >
-        </button>
-        <PublicSiteTools />
-        <button
-          type="button"
-          class="command-tool"
-          :title="t('common.language', '语言：简体中文')"
-          @click="toggleLocale"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="command-tool"
-          :title="t('common.settings', '设置')"
-          @click="router.push('/settings')"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2h-4v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1-2.8-2.8.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3v-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1 2.8-2.8.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3h4v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1 2.8 2.8-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2v4h-.2a1.7 1.7 0 0 0-1.4 1Z"
-            />
-          </svg>
-        </button>
-      </div>
-    </section>
-
+  <div class="dashboard-view" :class="{ 'is-footprints': showFootprints }">
+    <WorkspaceNavigation workspace />
     <div
-      v-if="showRecentRelaySwitcher"
-      class="recent-relay-switcher-overlay"
-      @click.self="showRecentRelaySwitcher = false"
+      v-show="showFootprints"
+      id="dashboard-footprints-panel"
+      class="dashboard-footprints-panel"
+      role="tabpanel"
+      aria-labelledby="dashboard-footprints-tab"
     >
-      <section
-        class="recent-relay-switcher"
-        :aria-label="t('dashboard.recentActiveRelay', '最近活跃中继')"
-      >
-        <button
-          type="button"
-          class="recent-relay-action"
-          :disabled="recentRelayBusy"
-          @click="switchRecentRelay('prev')"
-        >
-          <span
-            v-for="line in t('dashboard.prevActiveRelay', '上个活跃中继').split('\n')"
-            :key="line"
-            class="recent-relay-action-line"
-          >
-            {{ line }}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="recent-relay-action"
-          :disabled="recentRelayBusy"
-          @click="switchRecentRelay('next')"
-        >
-          <span
-            v-for="line in t('dashboard.nextActiveRelay', '下个活跃中继').split('\n')"
-            :key="line"
-            class="recent-relay-action-line"
-          >
-            {{ line }}
-          </span>
-        </button>
-      </section>
+      <KeepAlive
+        ><MapView
+          v-if="showFootprints"
+          :db-loaded="dbLoaded"
+          :fmo-address="fmoAddress"
+          :protocol="protocol"
+          :selected-from-callsign="selectedFromCallsign"
+          :own-callsign="ownCallsign"
+          :active-address-id="activeAddressId"
+          :address-list="addressList"
+          :total-logs="totalLogs"
+          :station-connected="stationConnected"
+          :station-busy="stationBusy"
+          @open-station-list="emit('open-station-list')"
+          @show-callsign-records="emit('show-callsign-records', $event)"
+      /></KeepAlive>
     </div>
-
-    <div class="dashboard-grid">
-      <section class="active-contact-card" :class="{ idle: !activeContact }">
-        <div class="section-label">
-          <span>{{
-            activeContact?.isSpeaking
-              ? t('dashboard.currentCall', '当前呼叫')
-              : t('dashboard.lastSpeaker', '最后发言')
-          }}</span>
-          <span>{{
-            activeContact?.isSpeaking ? t('dashboard.live', 'LIVE') : lastRefreshText
-          }}</span>
-        </div>
-
-        <div class="active-contact-main">
-          <div class="active-contact-primary">
-            <div class="callsign-wrap">
-              <h1>{{ activeContact?.callsign || t('dashboard.noSpeaker', '无人发言') }}</h1>
-              <span v-if="activeContact?.grid" class="grid-square">{{ activeContact.grid }}</span>
-              <span v-if="activeContact?.isNewCallsign" class="active-contact-new-badge">{{
-                t('dashboard.new', '新')
-              }}</span>
-            </div>
-            <div class="contact-tags">
-              <span v-if="activeContact?.hasLoggedContact" class="contact-status-tag">{{
-                t('dashboard.contacted', '已通联')
-              }}</span>
-              <span v-if="activeContact?.contactCount" class="history-count">{{
-                t('dashboard.history', `历史 ${activeContact.contactCount} 次`, {
-                  count: activeContact.contactCount
-                })
-              }}</span>
-              <span v-if="activeContact?.qth" class="qth-tag">QTH：{{ activeContact.qth }}</span>
-              <small v-if="activeContact && locationLabel(activeContact)">{{
-                locationLabel(activeContact)
-              }}</small>
-              <span v-if="!activeContact">{{ t('dashboard.waitingEvents', '等待实时事件') }}</span>
-            </div>
-            <div class="active-contact-controls">
-              <span
-                class="command-address"
-                :class="{ external: controlAccessInfo.isExternal }"
-                :title="controlAccessInfo.title"
-              >
-                {{ controlAccessInfo.label }}
-              </span>
-              <button class="command-refresh" :disabled="refreshing" @click="refreshNow">
-                {{
-                  refreshing
-                    ? t('common.refreshing', '刷新中...')
-                    : t('dashboard.refreshScene', '刷新现场')
-                }}
-              </button>
-              <span v-if="controlAccessInfo.isExternal" class="external-access-warning">
-                {{ t('dashboard.externalAccessWarning', '正在使用外网访问，请注意隐私安全') }}
-              </span>
-            </div>
+    <div
+      v-show="!showFootprints"
+      id="dashboard-live-panel"
+      class="live-workspace"
+      role="tabpanel"
+      aria-labelledby="dashboard-live-tab"
+    >
+      <section class="current-contact" :class="{ 'is-idle': !activeContact }" aria-label="当前通联">
+        <div class="contact-copy">
+          <div class="contact-eyebrow">
+            <span
+              :class="['live-indicator', { speaking: activeContact?.isSpeaking }, liveStatusKind]"
+            />{{
+              activeContact
+                ? activeContact.isSpeaking
+                  ? '正在通联'
+                  : '最近发言'
+                : stationConnected
+                  ? '守听中'
+                  : '未连接'
+            }}<span v-if="activeContact?.isSpeaking" class="live-text">LIVE</span>
           </div>
-
-          <div class="bearing-panel" :class="{ unavailable: !activeContact?.bearing }">
-            <div class="compass">
-              <span class="north-label">N</span>
-              <svg
-                class="compass-arrow"
-                viewBox="0 0 24 32"
-                aria-hidden="true"
-                :style="{ transform: `rotate(${activeContact?.bearing?.bearing || 0}deg)` }"
-              >
-                <path d="M12 2 21 29 12 23 3 29Z" />
-              </svg>
-            </div>
-            <div class="bearing-meta">
-              <strong>
-                <span class="bearing-direction">{{
-                  activeContact?.bearing?.direction || t('dashboard.bearingUnknown', '方位未知')
-                }}</span>
-                <span v-if="activeContact?.bearing" class="bearing-angle">
-                  {{ activeContact.bearing.bearing }}°
-                </span>
-              </strong>
-              <span v-if="activeContact?.bearing" class="bearing-distance">
-                {{ activeContact.bearing.distanceText }}
-              </span>
-              <span v-else>{{
-                activeContact?.bearingHint || t('dashboard.waitingLocation', '等待呼叫位置')
-              }}</span>
-            </div>
+          <div class="callsign-line">
+            <h1>{{ activeContact?.callsign || '等待通联' }}</h1>
+            <span v-if="activeContact?.grid" class="grid-label">{{ activeContact.grid }}</span
+            ><span v-if="activeContact?.isNewCallsign" class="new-label">新友台</span>
           </div>
-        </div>
-
-        <div class="contact-details">
-          <button
-            type="button"
-            class="contact-detail-card relay-detail-card"
-            :title="t('dashboard.relaySearch', '中继列表 / 搜索')"
-            @click="openStationList"
-          >
-            <span>{{ t('dashboard.relay', '中继 / 服务器') }}</span>
-            <strong>
-              {{
-                activeContact?.relayName ||
-                recentActiveRelayName ||
-                currentStation?.name ||
-                t('common.unknown', '未知')
-              }}
-              <small v-if="currentStation?.uid">#{{ currentStation.uid }}</small>
-            </strong>
-          </button>
-          <button
-            type="button"
-            class="contact-detail-card frequency-detail-card"
-            :title="recentRelayCommandTitle"
-            @click="showRecentRelaySwitcher = true"
-          >
-            <span>{{ t('dashboard.frequency', '频率 / 模式') }}</span>
-            <strong class="frequency-line">{{ currentFrequencyLine }}</strong>
-          </button>
-        </div>
-
-        <section class="mobile-previous-card">
-          <div class="section-label">
-            <span>{{ t('dashboard.previous', '上个通联') }}</span>
+          <div v-if="activeContact" class="contact-location">
             <span>{{
-              previousContact
-                ? formatTimeAgo(previousContact.timestamp)
-                : t('dashboard.noPrevious', '暂无')
-            }}</span>
-          </div>
-          <div v-if="previousContact" class="mobile-previous-main">
-            <div class="mobile-previous-identity">
-              <strong>{{ previousContact.callsign }}</strong>
-              <span v-if="previousContact.grid">{{ previousContact.grid }}</span>
-            </div>
-            <div class="mobile-previous-meta">
-              <span
-                v-if="previousContact.contactCount || previousContact.qsoConfirmedIncrement"
-                class="history-count"
-              >
-                {{
-                  t('dashboard.history', `历史 ${previousContact.contactCount} 次`, {
-                    count: previousContact.contactCount
-                  })
-                }}
-                <strong v-if="previousContact.qsoConfirmedIncrement" class="qso-plus-one"
-                  >+{{ previousContact.qsoConfirmedIncrement }}</strong
-                >
-              </span>
-              <span v-if="previousContact.qth" class="qth-tag">QTH：{{ previousContact.qth }}</span>
-              <span v-if="previousContact.bearing?.direction">{{
-                previousContact.bearing.direction
-              }}</span>
-            </div>
-          </div>
-          <div v-else class="mobile-previous-empty">
-            {{ t('dashboard.noPrevious', '暂无上个通联') }}
-          </div>
-        </section>
-
-        <nav class="dashboard-actions" :aria-label="t('dashboard.quickNavLabel', '仪表盘高频入口')">
-          <router-link
-            v-for="route in dashboardQuickRoutes"
-            :key="route.path"
-            :to="route.path"
-            :class="{ primary: route.type === 'remoteControl' }"
-          >
-            {{ route.label }}
-          </router-link>
-        </nav>
-      </section>
-
-      <aside class="dashboard-side">
-        <section class="previous-card">
-          <div class="section-label">
-            <span>{{ t('dashboard.previous', '上个通联') }}</span>
-            <span>{{
-              previousContact
-                ? formatTimeAgo(previousContact.timestamp)
-                : t('dashboard.noPrevious', '暂无')
-            }}</span>
-          </div>
-          <div v-if="previousContact" class="previous-main">
-            <div>
-              <div class="callsign-wrap">
-                <strong class="previous-callsign">{{ previousContact.callsign }}</strong>
-                <span v-if="previousContact.grid" class="grid-square">{{
-                  previousContact.grid
-                }}</span>
-              </div>
-              <div class="contact-tags">
-                <span
-                  v-if="previousContact.contactCount || previousContact.qsoConfirmedIncrement"
-                  class="history-count"
-                >
-                  {{
-                    t('dashboard.history', `历史 ${previousContact.contactCount} 次`, {
-                      count: previousContact.contactCount
-                    })
-                  }}
-                  <strong v-if="previousContact.qsoConfirmedIncrement" class="qso-plus-one"
-                    >+{{ previousContact.qsoConfirmedIncrement }}</strong
-                  >
-                </span>
-                <span v-if="previousContact.qth">QTH：{{ previousContact.qth }}</span>
-              </div>
-            </div>
-            <div class="mini-bearing">
-              <div class="compass">
-                <span class="north-label">N</span>
-                <svg
-                  class="compass-arrow"
-                  viewBox="0 0 24 32"
-                  aria-hidden="true"
-                  :style="{ transform: `rotate(${previousContact.bearing?.bearing || 0}deg)` }"
-                >
-                  <path d="M12 2 21 29 12 23 3 29Z" />
-                </svg>
-              </div>
-              <span>{{
-                previousContact.bearing?.direction || t('dashboard.bearingUnknown', '方位未知')
-              }}</span>
-            </div>
-          </div>
-          <div v-else class="side-empty">{{ t('dashboard.noPrevious', '暂无上个通联') }}</div>
-        </section>
-
-        <section class="server-card">
-          <button
-            type="button"
-            class="section-label server-card-header"
-            :title="t('dashboard.relaySearch', '中继列表 / 搜索')"
-            @click="openStationList"
-          >
-            <span>{{ t('dashboard.favoriteRelays', '收藏中继 / 服务器') }}</span>
-            <span class="server-list-trigger">{{
-              t('dashboard.relaySearch', '中继列表 / 搜索')
-            }}</span>
-          </button>
-          <div v-if="sortedStations.length" class="server-list">
-            <button
-              v-for="station in sortedStations"
-              :key="station.uid || station.name"
-              :disabled="switchingRelay === station.name"
-              :class="{
-                active: String(station.uid) === String(currentStation?.uid),
-                pinned: station.isPinned
-              }"
-              @click="switchRelay(station.name)"
+              activeContact?.qth || (activeContact ? '友台暂未提供位置' : '保持连接，等待实时通联')
+            }}</span
+            ><small v-if="activeContact && locationLabel(activeContact)">{{
+              locationLabel(activeContact)
+            }}</small
+            ><span v-if="activeContact?.hasLoggedContact"
+              >已通联{{
+                activeContact.contactCount ? ` · ${activeContact.contactCount} 次` : ''
+              }}</span
             >
-              <span class="station-name">{{ station.name }}</span>
-              <span v-if="station.isPinned" class="station-pin">{{
-                t('dashboard.favorite', '已收藏')
-              }}</span>
+          </div>
+          <div class="contact-meta">
+            <span
+              >频率 / 模式 <strong>{{ currentFrequencyLine }}</strong></span
+            ><button
+              type="button"
+              :title="recentRelayCommandTitle"
+              @click="showRecentRelaySwitcher = true"
+            >
+              最近中继 ⌄</button
+            ><button
+              v-if="activeContact?.hasLoggedContact"
+              type="button"
+              @click="openCallsignRecords(activeContact)"
+            >
+              通联详情 →
             </button>
           </div>
-          <div v-else class="side-empty">
-            {{
-              loadingStation
-                ? t('dashboard.loadingRelays', '正在读取中继...')
-                : t('dashboard.noRelays', '暂无中继列表')
-            }}
+          <div class="previous-line">
+            <span>上次通联</span
+            ><template v-if="previousContact"
+              ><strong>{{ previousContact.callsign }}</strong
+              ><span>{{ previousContact.qth || previousContact.grid || '位置未提供' }}</span
+              ><time>{{ formatTimeAgo(previousContact.timestamp) }}</time></template
+            ><span v-else>暂无记录</span>
           </div>
-        </section>
-      </aside>
-
-      <section class="live-panel">
-        <div class="panel-header">
-          <h3>{{ t('dashboard.recent20', '最近20个通联') }}</h3>
         </div>
-
-        <div v-if="displayRecords.length > 0" class="live-table-wrap">
+        <div
+          v-if="activeContact"
+          class="bearing-panel"
+          :class="{ unavailable: !activeContact?.bearing }"
+        >
+          <div class="compass">
+            <span class="north-label">N</span
+            ><svg
+              class="compass-arrow"
+              viewBox="0 0 24 32"
+              aria-hidden="true"
+              :style="{ transform: `rotate(${activeContact?.bearing?.bearing || 0}deg)` }"
+            >
+              <path d="M12 2 21 29 12 23 3 29Z" />
+            </svg>
+          </div>
+          <strong>{{
+            activeContact?.bearing
+              ? `${activeContact.bearing.direction} ${activeContact.bearing.bearing}°`
+              : '方位未知'
+          }}</strong
+          ><span>{{
+            activeContact?.bearing?.distanceText || activeContact?.bearingHint || '等待友台位置'
+          }}</span>
+        </div>
+      </section>
+      <section class="live-panel" aria-label="最近通联">
+        <header class="panel-heading">
+          <div>
+            <h2>最近通联</h2>
+            <span title="统计来自已同步的本地日志；下方列表包含盒子日志和实时发言。"
+              >本地日志：今日 {{ todayLogs }} · 累计 {{ totalLogs }} · 友台
+              {{ uniqueCallsigns }}</span
+            >
+          </div>
+          <button type="button" :disabled="refreshing" @click="refreshNow">
+            {{ refreshing ? '刷新中…' : '刷新' }}
+          </button>
+        </header>
+        <p v-if="error || refreshWarning" class="refresh-notice" role="status">
+          {{ error || refreshWarning }}
+        </p>
+        <div
+          v-if="displayRecords.length"
+          class="live-table-wrap"
+          tabindex="0"
+          aria-label="最近通联记录表格"
+        >
           <table class="live-table">
             <thead>
               <tr>
-                <th>{{ t('dashboard.callsign', '呼号') }}</th>
-                <th>{{ t('dashboard.time', '时间') }}</th>
-                <th>QTH</th>
-                <th>{{ t('dashboard.comment', '留言') }}</th>
-                <th>{{ t('dashboard.mode', '模式') }}</th>
-                <th>{{ t('dashboard.relay', '中继') }}</th>
+                <th>友台</th>
+                <th>时间</th>
+                <th>
+                  <span class="desktop-label">位置</span
+                  ><span class="mobile-label">位置 / 中继</span>
+                </th>
+                <th class="comment-column">留言</th>
+                <th class="mode-column">模式</th>
+                <th class="relay-column">中继</th>
               </tr>
             </thead>
             <tbody>
@@ -425,126 +159,109 @@
                 :key="record.rowId"
                 :class="{ 'is-speaking': record.isSpeaking }"
               >
-                <td
-                  class="callsign-cell"
-                  :class="{ 'is-clickable': record.hasLoggedContact && record.toCallsign }"
-                  :title="
-                    record.hasLoggedContact && record.toCallsign
-                      ? t('dashboard.viewContact', '查看通联卡片')
-                      : ''
-                  "
-                  @click="openCallsignRecords(record)"
-                >
-                  <strong>
-                    <button
-                      v-if="record.hasLoggedContact && record.toCallsign"
-                      class="callsign-card-link"
-                      :title="t('dashboard.viewContact', '查看通联卡片')"
-                      type="button"
-                      @click.stop="openCallsignRecords(record)"
-                    >
-                      {{ record.toCallsign }}
-                    </button>
-                    <template v-else>{{ record.toCallsign || '-' }}</template>
-                    <span
-                      v-if="record.contactCount > 0"
-                      class="contact-count-badge"
-                      :title="
-                        t('dashboard.history', `历史 ${record.contactCount} 次`, {
-                          count: record.contactCount
-                        })
-                      "
-                      >x{{ record.contactCount }}</span
-                    >
-                    <span
-                      v-else-if="record.toCallsign && !record.isSelf"
-                      class="new-callsign-badge"
-                      :title="t('dashboard.newCallsign', '新呼号')"
-                      >{{ t('dashboard.new', '新') }}</span
-                    >
-                    <span v-if="record.isSelf" class="self-badge">{{
-                      t('dashboard.you', '您')
-                    }}</span>
-                    <span v-if="record.isSpeaking" class="speaking-badge">{{
-                      t('dashboard.speaking', '正在发言')
-                    }}</span>
-                  </strong>
-                  <span v-if="record.toGrid">{{ record.toGrid }}</span>
+                <td>
+                  <button
+                    v-if="record.hasLoggedContact && record.toCallsign"
+                    type="button"
+                    class="callsign-link"
+                    @click="openCallsignRecords(record)"
+                  >
+                    {{ record.toCallsign }}</button
+                  ><strong v-else>{{ record.toCallsign || '—' }}</strong
+                  ><span v-if="record.isSpeaking" class="row-speaking">讲话中</span
+                  ><small>{{ record.toGrid || (record.isSelf ? '本机' : '') }}</small>
                 </td>
                 <td class="time-cell">
-                  <span>{{ formatDatePart(record.timestamp) }}</span>
-                  <span>{{ formatClockPart(record.timestamp) }}</span>
+                  {{ formatDatePart(record.timestamp)
+                  }}<small>{{ formatClockPart(record.timestamp) }}</small>
                 </td>
-                <td class="qth-cell">
-                  <span class="qth-content">{{ record.qth || '-' }}</span>
-                  <small v-if="locationLabel(record)" style="display: block">
-                    {{ locationLabel(record) }}
+                <td class="position-cell">
+                  {{ record.qth || '—'
+                  }}<small v-if="locationLabel(record)"
+                    >{{ locationLabel(record) }}
                     <a
                       v-if="aprsFiSource(record)"
                       href="https://aprs.fi/"
                       target="_blank"
                       rel="noopener noreferrer"
                       >aprs.fi</a
-                    >
-                  </small>
-                </td>
-                <td class="comment-cell">{{ record.toComment || '-' }}</td>
-                <td>{{ stationIdentity(record.toCallsign).mode || record.mode || '-' }}</td>
-                <td class="relay-cell">
-                  <button
+                    ></small
+                  ><button
                     v-if="record.relayName"
-                    class="relay-link"
+                    type="button"
+                    class="relay-link mobile-relay-link"
                     :disabled="switchingRelay === record.relayName"
-                    :title="
-                      t('dashboard.switchToRelay', `切换到 ${record.relayName}`, {
-                        name: record.relayName
-                      })
-                    "
                     @click="switchRelay(record.relayName)"
                   >
                     {{ record.relayName }}
                   </button>
-                  <span
-                    v-if="record.isRelayPinned"
-                    class="favorite-indicator"
-                    :title="t('dashboard.inFmoFavorites', '已在 FMO 收藏中')"
-                    >★</span
+                </td>
+                <td class="comment-column">{{ record.toComment || '—' }}</td>
+                <td class="mode-column">
+                  {{ stationIdentity(record.toCallsign).mode || record.mode || '—' }}
+                </td>
+                <td class="relay-column">
+                  <button
+                    v-if="record.relayName"
+                    type="button"
+                    class="relay-link"
+                    :disabled="switchingRelay === record.relayName"
+                    @click="switchRelay(record.relayName)"
                   >
-                  <span v-if="!record.relayName">-</span>
-                  <span v-if="record.relayAdmin" class="relay-admin"
-                    >（{{ record.relayAdmin }}）</span
-                  >
+                    {{ record.relayName }}</button
+                  ><span v-else>—</span
+                  ><small v-if="record.relayAdmin">{{ record.relayAdmin }}</small
+                  ><span v-if="record.isRelayPinned" class="pinned-mark" title="已收藏">★</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-
         <div v-else class="empty-state">
-          {{
-            refreshing
-              ? t('dashboard.readingContacts', '正在刷新仪表盘...')
-              : t('dashboard.waitingEvents', '等待实时事件')
-          }}
+          <strong>{{ refreshing ? '正在读取通联' : '等待实时通联' }}</strong>
+          <p>
+            {{ fmoAddress ? '新的通联会在这里实时出现。' : '先连接 FMO 盒子，开始查看实时通联。' }}
+          </p>
+          <button v-if="!fmoAddress" type="button" @click="router.push('/settings')">
+            连接设备
+          </button>
         </div>
+        <footer class="panel-footer">
+          <span>盒子日志与实时发言 · 最近 20 个友台</span><span>{{ lastRefreshText }}</span>
+        </footer>
       </section>
     </div>
+    <div
+      v-if="showRecentRelaySwitcher && !showFootprints"
+      class="recent-relay-switcher-overlay"
+      @click.self="showRecentRelaySwitcher = false"
+    >
+      <section class="recent-relay-switcher" aria-label="最近活跃中继">
+        <h2>最近活跃中继</h2>
+        <div>
+          <button type="button" :disabled="recentRelayBusy" @click="switchRecentRelay('prev')">
+            上个活跃中继</button
+          ><button type="button" :disabled="recentRelayBusy" @click="switchRecentRelay('next')">
+            下个活跃中继
+          </button>
+        </div>
+        <button class="relay-close" type="button" @click="showRecentRelaySwitcher = false">
+          关闭
+        </button>
+      </section>
+    </div>
+    <p v-if="voiceStatus" class="sr-only" role="status">{{ voiceStatus }}</p>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { FmoApiClient } from '../services/fmoApi'
-import {
-  formatFreqHz,
-  formatTimestamp,
-  MORE_ROUTES,
-  NAV_ROUTES
-} from '../components/home/constants'
+import { formatFreqHz, formatTimestamp } from '../components/home/constants'
 import { getControlTarget, switchStationByRelayName } from '../services/stationControl'
 import { useSpeakingStatusStore } from '../stores/speakingStore'
 import { gridToAddress } from '../services/gridService'
@@ -556,12 +273,18 @@ import { playCallsignSpeech } from '../services/callsignSpeech'
 import { formatCallsignForSpeech as formatCallsignForNatoSpeech } from '../utils/callsignSpeechText'
 import toast from '../composables/useToast'
 import { useLocale } from '../composables/useLocale'
-import PublicSiteTools from '../components/home/PublicSiteTools.vue'
+import WorkspaceNavigation from '../components/home/WorkspaceNavigation.vue'
+import { dashboardView } from '../core/navigation'
+
+const MapView = defineAsyncComponent(() => import('./MapView.vue'))
 
 const FmoSpeech = registerPlugin('FmoSpeech')
 const IOS_SPEECH_RATE = 1
 
 const props = defineProps({
+  dbLoaded: { type: Boolean, default: false },
+  activeAddressId: { type: String, default: '' },
+  addressList: { type: Array, default: () => [] },
   fmoAddress: {
     type: String,
     default: ''
@@ -620,27 +343,9 @@ const emit = defineEmits([
   'station-next'
 ])
 const router = useRouter()
-const { t, isEnglish, toggleLocale } = useLocale()
-const isDarkTheme = ref(
-  localStorage.getItem('fmo_theme') === 'dark' ||
-    (!localStorage.getItem('fmo_theme') &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-)
-
-function applyTheme() {
-  document.documentElement.dataset.theme = isDarkTheme.value ? 'dark' : 'light'
-  localStorage.setItem('fmo_theme', isDarkTheme.value ? 'dark' : 'light')
-}
-
-function toggleTheme() {
-  isDarkTheme.value = !isDarkTheme.value
-  applyTheme()
-}
-
-function openStationList() {
-  emit('open-station-list')
-}
-
+const currentRoute = useRoute()
+const showFootprints = computed(() => dashboardView(currentRoute.query) === 'footprints')
+const { t, isEnglish } = useLocale()
 const records = ref([])
 const currentStation = ref(null)
 const refreshing = ref(false)
@@ -673,76 +378,14 @@ const VOICE_REPEAT_INTERVAL_MS = 10 * 60 * 1000
 const VOICE_HISTORY_KEY = 'fmo_dashboard_voice_history'
 const FOREGROUND_REFRESH_DEBOUNCE_MS = 1200
 const ANNOUNCE_DEDUP_WINDOW_MS = 3000
-const DASHBOARD_QUICK_ROUTE_TYPES = [
-  'logs',
-  'oldFriends',
-  'top20',
-  'messages',
-  'settings',
-  'remoteControl',
-  'wishWall',
-  'more'
-]
-const DASHBOARD_QUICK_LABELS = {
-  logs: '日志',
-  oldFriends: '好友',
-  top20: '排行榜',
-  messages: '消息',
-  settings: '设置',
-  remoteControl: 'FMO控制',
-  wishWall: '愿望墙',
-  more: '更多'
-}
-
 const shouldReconnectEventsOnForeground =
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 const recentAnnouncements = new Map()
-const allDashboardRoutes = [...NAV_ROUTES, ...MORE_ROUTES]
-const dashboardQuickRoutes = computed(() =>
-  DASHBOARD_QUICK_ROUTE_TYPES.map((type) => {
-    const route = allDashboardRoutes.find((item) => item.type === type)
-    return route
-      ? {
-          ...route,
-          label: isEnglish.value
-            ? t(`nav.${type}`, DASHBOARD_QUICK_LABELS[type])
-            : DASHBOARD_QUICK_LABELS[type]
-        }
-      : null
-  }).filter(Boolean)
-)
-
 const controlTarget = computed(() => getControlTarget(props.fmoAddress, props.protocol))
 const controlHost = computed(() => controlTarget.value.host)
 const controlProtocol = computed(() => controlTarget.value.protocol)
-const controlAccessInfo = computed(() => {
-  if (!controlHost.value) {
-    return {
-      isExternal: false,
-      label: t('dashboard.noFmoAddress', '未配置 FMO 地址'),
-      title: t('dashboard.noFmoAddress', '未配置 FMO 地址')
-    }
-  }
-
-  const host = stripHostPort(controlHost.value)
-  const isLocal = isLocalAccessHost(host)
-  const protocolText = controlProtocol.value ? `${controlProtocol.value}://` : ''
-  if (isLocal) {
-    return {
-      isExternal: false,
-      label: `${protocolText}${t('dashboard.localAccess', '局域网地址')}`,
-      title: `${protocolText}${host}`
-    }
-  }
-
-  return {
-    isExternal: true,
-    label: `${protocolText}${t('dashboard.externalAccess', '外网访问')}`,
-    title: t('dashboard.externalAccessWarning', '正在使用外网访问，请注意隐私安全')
-  }
-})
 const speakingStatus = useSpeakingStatusStore()
-const { speakingHistory, allSpeakingHistories, primaryConnected } = storeToRefs(speakingStatus)
+const { speakingHistory, allSpeakingHistories } = storeToRefs(speakingStatus)
 
 const lastRefreshText = computed(() => {
   if (!lastRefreshAt.value) return t('dashboard.neverRefreshed', '尚未刷新')
@@ -755,24 +398,6 @@ const liveStatusKind = computed(() => {
   if (error.value) return 'error'
   if (refreshWarning.value) return 'warning'
   return ''
-})
-
-const totalContactCount = computed(() => {
-  if (props.contactCounts instanceof Map) {
-    return Array.from(props.contactCounts.values()).reduce(
-      (sum, count) => sum + Number(count || 0),
-      0
-    )
-  }
-  return Object.values(props.contactCounts || {}).reduce(
-    (sum, count) => sum + Number(count || 0),
-    0
-  )
-})
-
-const todayContactCount = computed(() => {
-  if (props.todayContactedCallsigns instanceof Set) return props.todayContactedCallsigns.size
-  return Object.keys(props.todayContactedCallsigns || {}).length
 })
 
 const currentFrequencyDisplay = computed(() => {
@@ -806,21 +431,6 @@ const currentFrequencyLine = computed(() => {
     return parts.join('/')
   }
   return [display.single?.replace(/\s*MHz$/i, ''), display.mode].filter(Boolean).join('/')
-})
-
-const sortedStations = computed(() => {
-  const pinnedUids = new Set(pinnedStations.value.map((station) => String(station.uid)))
-  const merged = allStations.value.map((station) => ({
-    ...station,
-    isPinned: pinnedUids.has(String(station.uid))
-  }))
-
-  return merged.sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-    if (String(a.uid) === String(currentStation.value?.uid)) return -1
-    if (String(b.uid) === String(currentStation.value?.uid)) return 1
-    return String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN')
-  })
 })
 
 const currentSpeakingRecord = computed(() => {
@@ -1345,30 +955,6 @@ function formatAddress(address) {
     address.name
   if (direct && !isMaidenheadGrid(direct)) return direct
   return ''
-}
-
-function stripHostPort(host) {
-  const raw = String(host || '').trim()
-  if (!raw) return ''
-  if (raw.startsWith('[')) return raw.slice(1, raw.indexOf(']')).toLowerCase()
-  return raw.split(':')[0].toLowerCase()
-}
-
-function isLocalAccessHost(host) {
-  if (!host) return false
-  if (host === 'localhost' || host.endsWith('.local')) return true
-  if (host === '::1') return true
-
-  const parts = host.split('.').map((part) => Number(part))
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) return false
-  const [a, b] = parts
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254)
-  )
 }
 
 function getRecordQth(record) {
@@ -2285,10 +1871,6 @@ async function switchRecentRelay(direction) {
 }
 
 onMounted(() => {
-  applyTheme()
-  if (controlHost.value && !primaryConnected.value) {
-    speakingStatus.connectEventWs(controlHost.value, controlProtocol.value)
-  }
   refreshSpeakingSnapshot()
   refreshDashboard()
   timer = setInterval(refreshDashboard, REFRESH_INTERVAL_MS)
@@ -2319,2763 +1901,647 @@ onUnmounted(() => {
 
 <style scoped>
 .dashboard-view {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
-  padding: 1rem;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-
-.dashboard-command-bar,
-.station-band,
-.live-panel {
-  min-width: 0;
-  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border-light) 78%, var(--color-primary));
-  border-radius: 8px;
-  box-shadow: var(--shadow-panel);
-}
-
-.dashboard-command-bar {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
-  gap: 0.85rem;
-  align-items: center;
-  padding: 0.8rem;
-  flex-shrink: 0;
-}
-
-.connection-strip {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  min-width: 0;
-  padding: 0.2rem 0.25rem;
-}
-
-.status-dot {
-  width: 0.68rem;
-  height: 0.68rem;
-  border-radius: 50%;
-  background: var(--color-success);
-  box-shadow: 0 0 0 0.28rem var(--surface-success);
-  flex-shrink: 0;
-}
-
-.status-dot.error {
-  background: var(--color-danger);
-  box-shadow: 0 0 0 0.28rem var(--surface-danger);
-}
-
-.status-dot.warning {
-  background: var(--color-warning);
-  box-shadow: 0 0 0 0.28rem var(--surface-warning);
-}
-
-.connection-copy {
-  display: grid;
-  gap: 0.08rem;
-  min-width: 0;
-}
-
-.connection-copy strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 0.96rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-
-.quick-actions {
+.dashboard-footprints-panel {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-direction: column;
+  overflow: hidden;
 }
-
-.quick-actions::-webkit-scrollbar {
-  display: none;
+.dashboard-footprints-panel :deep(.footprint-view) {
+  flex: 1 1 0;
+  min-height: 0;
 }
-
-.quick-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.15rem;
-  padding: 0 0.78rem;
-  border: 1px solid var(--border-light);
-  border-radius: 7px;
-  background: var(--surface-accent);
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  font-weight: 650;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    border-color 0.2s,
-    background-color 0.2s,
-    color 0.2s;
-}
-
-.quick-action:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 50%, var(--border-light));
-  background: color-mix(in srgb, var(--surface-accent) 65%, var(--bg-card));
-  color: var(--color-primary);
-}
-
-.station-band {
+.live-workspace {
+  flex: 1 1 0;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.36fr);
-  align-items: stretch;
-  gap: 1rem;
-  padding: 1rem;
-  flex-shrink: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  padding: 22px;
+  overflow: hidden;
+  animation: workspace-arrive 0.25s ease-out;
 }
-
-.eyebrow {
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.station-band h2 {
-  margin: 0.2rem 0;
-  color: var(--text-primary);
-  font-size: 1.3rem;
-}
-
-.station-band p {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-}
-
-.station-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
-  align-content: stretch;
-  min-width: 0;
-}
-
-.active-contact-card {
-  min-width: 0;
-  padding: 1rem;
-  border: 1px solid color-mix(in srgb, var(--border-light) 75%, var(--color-primary));
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--surface-accent), transparent 58%), var(--bg-card);
-}
-
-.active-contact-main {
+.current-contact {
+  max-height: min(320px, 44vh);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1.25rem;
-}
-
-.active-contact-primary {
+  gap: 32px;
   min-width: 0;
-  display: grid;
-  align-self: stretch;
-  align-content: start;
-  gap: 0.18rem;
+  min-height: 0;
+  padding: 24px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
-
-.active-contact-primary h1,
-.active-contact-primary h2,
-.active-contact-empty h2 {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0;
-  color: var(--text-primary);
-  font-size: clamp(2.2rem, 5vw, 4.1rem);
-  line-height: 0.96;
-  letter-spacing: 0;
+.current-contact.is-idle {
+  padding-block: 18px;
 }
-
-.active-contact-new-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(64, 158, 255, 0.45);
-  border-radius: 4px;
-  min-width: 1.36rem;
-  height: 1.1rem;
-  padding: 0 0.26rem;
-  color: var(--color-primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1;
-  transform: translateY(-0.08rem);
-  vertical-align: baseline;
+.current-contact.is-idle .callsign-line h1 {
+  font-size: 30px;
+  letter-spacing: -0.5px;
 }
-
-.active-contact-primary p,
-.active-contact-empty p {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-size: clamp(0.95rem, 1.25vw, 1.08rem);
-  line-height: 1.35;
+.current-contact.is-idle .previous-line {
+  margin-top: 14px;
 }
-
-.active-contact-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.55rem;
+.current-contact.is-idle .previous-line strong {
+  font-size: 18px;
+  font-weight: 600;
 }
-
-.active-contact-meta span + span::before {
-  content: '·';
-  margin-right: 0.55rem;
-  color: var(--text-disabled);
-}
-
-.active-contact-card.idle .active-contact-empty h2 {
+.current-contact.is-idle .previous-line time {
+  font-size: 14px;
   color: var(--text-secondary);
 }
-
+.contact-copy {
+  min-width: 0;
+  flex: 1;
+}
+.contact-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.live-indicator {
+  width: 7px;
+  height: 7px;
+  background: var(--text-tertiary);
+  border-radius: 50%;
+}
+.live-indicator.speaking {
+  background: var(--color-speaking);
+  box-shadow: 0 0 0 4px var(--surface-success);
+}
+.live-indicator.error {
+  background: var(--color-danger);
+}
+.live-indicator.warning {
+  background: var(--color-warning);
+}
+.live-text {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--color-success);
+}
+.callsign-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 10px;
+}
+.callsign-line h1 {
+  margin: 0;
+  font-size: clamp(34px, 4.6vw, 64px);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -1.5px;
+  overflow-wrap: anywhere;
+}
+.grid-label {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+.new-label {
+  font-size: 12px;
+  background: var(--surface-accent);
+  color: var(--color-primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.contact-location {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.contact-location small {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.contact-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.contact-meta strong {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+.contact-meta button {
+  font: inherit;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  padding: 0;
+  cursor: pointer;
+}
+.previous-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-secondary);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.previous-line strong {
+  color: var(--text-primary);
+  font-weight: 550;
+}
+.previous-line time {
+  margin-left: auto;
+  font-size: 12px;
+}
 .bearing-panel {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  min-width: 210px;
-  height: 116px;
-  padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--border-light) 70%, var(--color-success));
-  border-radius: 8px;
-  background: var(--surface-success);
-  overflow: hidden;
+  flex-direction: column;
+  gap: 5px;
+  width: 130px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
-
-.bearing-panel strong,
-.bearing-panel span {
-  display: block;
-  white-space: nowrap;
-}
-
-.bearing-panel strong {
-  align-items: baseline;
-  gap: 0.28rem;
-  color: var(--text-primary);
-  font-size: 1rem;
-  line-height: 1.15;
-}
-
-.bearing-panel span {
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-  line-height: 1.2;
-}
-
-.bearing-direction,
-.bearing-angle,
-.bearing-distance {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
-}
-
 .compass {
   position: relative;
-  width: 52px;
-  height: 52px;
-  margin-top: 0.55rem;
-  border: 2px solid color-mix(in srgb, var(--color-success) 45%, var(--border-secondary));
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--color-primary);
   border-radius: 50%;
-  color: var(--color-success);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  margin-bottom: 5px;
+  color: var(--color-primary);
 }
-
 .north-label {
   position: absolute;
-  top: -0.68rem;
-  left: 50%;
-  transform: translateX(-50%);
-  color: var(--text-tertiary);
-  font-size: 0.58rem;
-  line-height: 1;
-  pointer-events: none;
+  top: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
-
 .compass-arrow {
-  display: block;
   width: 22px;
   height: 30px;
+  fill: var(--surface-accent);
+  stroke: var(--color-primary);
+  stroke-width: 1.5;
   transform-origin: 50% 50%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.1;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.18));
+  transition: transform 0.35s ease-out;
 }
-
-.compass.unavailable {
-  color: var(--text-disabled);
+.bearing-panel.unavailable .compass {
+  border-color: var(--border-primary);
+  opacity: 0.6;
 }
-
-.station-summary {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-  padding: 0.85rem;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background: var(--bg-table-stripe);
-  text-align: left;
-}
-
-.station-summary strong {
-  color: var(--text-primary);
-  font-size: 1.05rem;
-  line-height: 1.25;
-}
-
-.station-summary span:last-child {
-  color: var(--text-tertiary);
-  font-size: 0.82rem;
-}
-
-.refresh-btn {
-  width: 100%;
-  min-height: 2.55rem;
-  border: 1px solid var(--color-success);
-  background: var(--color-success);
-  color: #fff;
-  border-radius: 7px;
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
-  white-space: nowrap;
-  font-weight: 700;
-}
-
-.refresh-btn:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.refresh-stack {
-  display: grid;
-  justify-items: stretch;
-  gap: 0.28rem;
-  flex-shrink: 0;
-}
-
-.refresh-time,
-.record-count {
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-}
-
-.refresh-time {
+.bearing-panel > span {
+  font-size: 12px;
   text-align: center;
+  color: var(--text-secondary);
 }
-
 .live-panel {
-  min-height: 0;
-  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
+  border: 1px solid var(--border-secondary);
+  border-radius: 12px;
+  background: var(--bg-card);
 }
-
-.panel-header {
+.panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.62rem 0.85rem;
-  border-bottom: 1px solid var(--border-light);
+  gap: 16px;
+  padding: 17px 20px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border-secondary);
 }
-
-.panel-header h3 {
+.panel-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.panel-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
   margin: 0;
+}
+.panel-heading span {
+  font-size: 12px;
   color: var(--text-secondary);
-  font-size: 0.86rem;
-  font-weight: 700;
 }
-
+.panel-heading button,
+.empty-state button {
+  border: 1px solid var(--border-secondary);
+  border-radius: 5px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.panel-heading button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .live-table-wrap {
-  min-height: 0;
   flex: 1;
+  min-height: 0;
   overflow: auto;
-  max-width: 100%;
+  overscroll-behavior: contain;
 }
-
 .live-table {
   width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
-}
-
-.live-table th,
-.live-table td {
-  padding: 0.34rem 0.58rem;
-  border-bottom: 1px solid var(--border-light);
-  color: var(--text-primary);
-  font-size: 0.82rem;
-  line-height: 1.16;
+  border-collapse: collapse;
+  font-size: 13px;
   text-align: left;
-  vertical-align: middle;
 }
-
+.mobile-label,
+.mobile-relay-link {
+  display: none;
+}
 .live-table th {
   position: sticky;
   top: 0;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
   z-index: 1;
-  background: color-mix(in srgb, var(--bg-table-header) 82%, var(--bg-card));
-  color: var(--text-tertiary);
-  font-size: 0.7rem;
-  font-weight: 700;
 }
-
-.live-table tr.is-speaking td {
-  background: rgba(76, 175, 80, 0.1);
-}
-
-.callsign-cell {
-  width: clamp(118px, 12vw, 148px);
-}
-
-.callsign-cell strong {
-  display: block;
-  font-size: 0.88rem;
-  line-height: 1.12;
-}
-
-.callsign-card-link {
-  appearance: none;
-  border: 0;
-  border-radius: 4px;
-  margin: -0.05rem -0.12rem;
-  padding: 0.05rem 0.12rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  font-weight: inherit;
-  letter-spacing: 0;
-}
-
-.callsign-card-link:hover,
-.callsign-card-link:focus-visible {
-  background: var(--bg-table-hover);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.16rem;
-  outline: none;
-}
-
-.callsign-cell.is-clickable {
-  cursor: pointer;
-}
-
-.callsign-cell.is-clickable:active .callsign-card-link,
-.callsign-cell.is-clickable:active .contact-count-badge {
-  opacity: 0.75;
-}
-
-.callsign-cell span,
-.relay-admin {
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-}
-
-.callsign-cell .speaking-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.35rem;
-  border: 1px solid rgba(76, 175, 80, 0.45);
-  border-radius: 4px;
-  padding: 0.05rem 0.3rem;
-  color: var(--color-success);
-  font-size: 0.7rem;
-  font-weight: 600;
-  vertical-align: middle;
-}
-
-.callsign-cell .contact-count-badge,
-.callsign-cell .new-callsign-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.28rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.1;
-  vertical-align: middle;
-}
-
-.callsign-cell .contact-count-badge {
-  color: #f59e0b;
-}
-
-.callsign-cell .new-callsign-badge {
-  color: var(--color-primary);
-}
-
-.callsign-cell .self-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.28rem;
-  border: 1px solid rgba(64, 158, 255, 0.45);
-  border-radius: 4px;
-  padding: 0.04rem 0.28rem;
-  color: var(--color-primary);
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.1;
-  vertical-align: middle;
-}
-
-.time-cell {
-  width: 118px;
-  white-space: nowrap;
-}
-
-.time-cell span {
-  display: block;
-}
-
-.time-cell span + span {
-  margin-top: 0.12rem;
-  color: var(--text-secondary);
-}
-
-.qth-cell {
-  width: clamp(170px, 18vw, 230px);
-  color: var(--text-secondary);
-}
-
-.qth-content {
-  display: -webkit-box;
-  overflow: hidden;
-  word-break: break-word;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.comment-cell {
-  width: auto;
-  word-break: break-word;
-}
-
-.relay-cell {
-  width: clamp(130px, 15vw, 185px);
+.live-table td,
+.live-table th {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-secondary);
   overflow-wrap: anywhere;
 }
-
-.live-table th:nth-child(5),
-.live-table td:nth-child(5) {
-  width: 130px;
-  padding-left: 12px;
-  padding-right: 16px;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  text-align: center;
+.live-table th:nth-child(1) {
+  width: 17%;
 }
-
+.live-table th:nth-child(2) {
+  width: 15%;
+}
+.live-table th:nth-child(3) {
+  width: 23%;
+}
+.live-table th:nth-child(4) {
+  width: 18%;
+}
+.live-table th:nth-child(5) {
+  width: 9%;
+}
+.live-table th:nth-child(6) {
+  width: 18%;
+}
+.live-table td small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.live-table tr.is-speaking {
+  background: color-mix(in srgb, var(--surface-success) 55%, var(--bg-card));
+}
+.callsign-link,
 .relay-link {
-  max-width: 100%;
-  overflow-wrap: anywhere;
   border: 0;
+  padding: 0;
   background: transparent;
   color: var(--color-primary);
-  cursor: pointer;
   font: inherit;
-  font-weight: 600;
-  padding: 0;
+  cursor: pointer;
   text-align: left;
 }
-
-.favorite-indicator {
-  margin-left: 0.35rem;
-  color: var(--color-warning, #e6a23c);
-  font-size: 0.9rem;
+.callsign-link {
+  font-weight: 600;
 }
-
-.relay-link:hover:not(:disabled) {
-  text-decoration: underline;
+.row-speaking {
+  display: inline-block;
+  margin-left: 7px;
+  font-size: 12px;
+  color: var(--color-success);
 }
-
-.relay-link:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.pinned-mark {
+  font-size: 12px;
+  color: var(--color-warning);
+  margin-left: 5px;
 }
-
+.panel-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 20px;
+  border-top: 1px solid var(--border-secondary);
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.refresh-notice {
+  padding: 10px 20px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warning);
+  max-height: 70px;
+  overflow: auto;
+}
 .empty-state {
   flex: 1;
-  padding: 3rem 1rem;
-  color: var(--text-tertiary);
-  text-align: center;
-}
-
-@media (max-width: 768px) {
-  .dashboard-view {
-    padding: 1rem;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  .dashboard-command-bar {
-    grid-template-columns: 1fr;
-    gap: 0.65rem;
-    padding: 0.75rem;
-  }
-
-  .quick-actions {
-    justify-content: flex-start;
-    width: 100%;
-    padding-bottom: 0.1rem;
-  }
-
-  .quick-action {
-    min-height: 2rem;
-    padding: 0 0.68rem;
-    font-size: 0.82rem;
-  }
-
-  .station-band,
-  .panel-header {
-    align-items: flex-start;
-  }
-
-  .station-band {
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
-  }
-
-  .active-contact-card {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .active-contact-main {
-    align-items: center;
-    flex-direction: row;
-    gap: 0.75rem;
-    width: 100%;
-  }
-
-  .station-actions {
-    align-items: center;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.75rem;
-    width: 100%;
-  }
-
-  .active-contact-primary {
-    flex: 1 1 auto;
-  }
-
-  .station-summary {
-    min-width: 0;
-    text-align: left;
-    flex: 1 1 auto;
-  }
-
-  .bearing-panel {
-    min-width: 154px;
-    width: auto;
-    height: 92px;
-    flex: 0 0 auto;
-    gap: 0.55rem;
-    padding: 0.5rem 0.6rem;
-  }
-
-  .compass {
-    width: 38px;
-    height: 38px;
-    margin-top: 0.52rem;
-  }
-
-  .compass-arrow {
-    width: 18px;
-    height: 25px;
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2,
-  .active-contact-empty h2 {
-    font-size: clamp(1.35rem, 6.8vw, 1.9rem);
-    line-height: 1;
-  }
-
-  .active-contact-primary p,
-  .active-contact-empty p {
-    font-size: 0.88rem;
-    line-height: 1.3;
-  }
-
-  .active-contact-primary p {
-    overflow: hidden;
-  }
-
-  .refresh-btn {
-    flex: 0 0 auto;
-    padding: 0.42rem 0.75rem;
-  }
-
-  .refresh-time {
-    width: auto;
-    white-space: nowrap;
-    font-size: 0.74rem;
-  }
-
-  .live-table {
-    min-width: 780px;
-  }
-
-  .live-table-wrap {
-    max-height: 70vh;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-@media (max-width: 520px) {
-  .dashboard-view {
-    padding: 0.75rem;
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2,
-  .active-contact-empty h2 {
-    font-size: clamp(1.25rem, 6.4vw, 1.7rem);
-  }
-
-  .active-contact-primary p,
-  .active-contact-empty p {
-    font-size: 0.82rem;
-  }
-
-  .bearing-panel {
-    min-width: 138px;
-    height: 86px;
-    gap: 0.45rem;
-    padding: 0.45rem 0.5rem;
-  }
-
-  .bearing-panel strong {
-    font-size: 0.92rem;
-  }
-
-  .bearing-panel span {
-    font-size: 0.75rem;
-  }
-
-  .station-summary strong {
-    font-size: 0.95rem;
-  }
-
-  .station-summary span:last-child {
-    display: block;
-    font-size: 0.74rem;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-  }
-
-  .live-table {
-    min-width: 735px;
-  }
-
-  .live-table th,
-  .live-table td {
-    padding: 0.42rem 0.5rem;
-    font-size: 0.86rem;
-  }
-
-  .callsign-cell {
-    width: 112px;
-  }
-
-  .time-cell {
-    width: 106px;
-  }
-
-  .qth-cell {
-    width: 205px;
-  }
-
-  .qth-content {
-    -webkit-line-clamp: 2;
-  }
-
-  .relay-cell {
-    width: 145px;
-  }
-}
-
-/* V2 dashboard slices */
-.dashboard-view {
-  padding: 0;
-}
-
-.dashboard-command-bar {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  border-radius: 0;
-  border-width: 0 0 1px;
-  box-shadow: none;
-}
-
-.dashboard-brand {
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-width: max-content;
-}
-
-.dashboard-brand-mark {
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid var(--color-primary);
-  border-radius: 7px;
-  object-fit: cover;
-}
-
-.dashboard-brand strong {
-  color: var(--text-primary);
-  font-size: 1rem;
-  white-space: nowrap;
-}
-
-.connection-strip {
-  gap: 0.8rem;
-}
-
-.connection-copy {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.6rem;
-}
-
-.connection-copy strong {
-  font-size: 1rem;
-}
-
-.connection-copy span {
-  color: var(--text-tertiary);
-  font-size: 0.82rem;
-}
-
-.command-stats,
-.mobile-command-stats,
-.command-tools {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.command-stats span,
-.mobile-command-stats span,
-.command-address {
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.command-stats .command-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.mobile-command-stats {
-  display: none;
-}
-
-.stat-star {
-  color: #f6b925;
-  font-size: 0.92rem;
-  text-shadow: 0 0 8px rgba(246, 185, 37, 0.28);
-}
-
-.stat-light {
-  width: 0.48rem;
-  height: 0.48rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-
-.friend-stat .stat-light {
-  background: #45b6ff;
-  box-shadow: 0 0 0 3px rgba(69, 182, 255, 0.12);
-}
-
-.today-stat .stat-light {
-  background: #65d47e;
-  box-shadow: 0 0 0 3px rgba(101, 212, 126, 0.12);
-}
-
-.command-tools {
-  justify-content: flex-end;
-}
-
-.command-select-wrap {
-  display: inline-flex;
-  height: 2.25rem;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0 0.4rem 0 0.6rem;
-  border: 1px solid var(--border-light);
-  border-radius: 7px;
-  color: var(--color-primary);
-  background: var(--surface-accent);
-}
-
-.command-select {
-  width: 7.5rem;
-  height: 100%;
-  padding: 0 1.25rem 0 0;
-  border: 0;
-  outline: 0;
-  color: var(--text-primary);
-  background: transparent;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.command-tool {
-  display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  padding: 0;
-  border: 1px solid var(--border-light);
-  border-radius: 7px;
+  padding: 20px;
+  overflow: auto;
+}
+.empty-state strong {
+  font-size: 16px;
+  font-weight: 500;
   color: var(--text-secondary);
-  background: var(--bg-table-stripe);
-  font-size: 0.76rem;
-  font-weight: 700;
-  white-space: nowrap;
 }
-
-.command-tool-wide {
-  width: auto;
-  padding: 0 0.65rem;
+.empty-state p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  text-align: center;
 }
-
-.command-tool.active,
-.command-tool:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 50%, var(--border-light));
-  color: var(--color-primary);
-  background: var(--surface-accent);
-}
-
-.command-tool svg {
-  width: 1rem;
-  height: 1rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.tool-icon {
-  font-size: 1rem;
-  line-height: 1;
-}
-
 .recent-relay-switcher-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  background: var(--overlay-bg);
+  z-index: 12000;
   display: grid;
-  align-items: start;
-  justify-items: center;
-  padding: calc(5rem + var(--safe-inset-top, env(safe-area-inset-top, 0px))) 1rem 1rem;
-  background: rgba(0, 0, 0, 0.38);
+  place-items: center;
+  padding: 20px;
 }
-
 .recent-relay-switcher {
-  display: grid;
-  width: min(100%, 22rem);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  padding: 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--border-light) 75%, var(--color-success));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
-  box-shadow: var(--shadow-panel);
+  width: min(390px, 100%);
+  padding: 24px;
+  border-radius: 12px;
+  background: var(--bg-card);
 }
-
-.recent-relay-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  min-height: 3rem;
-  border: 0;
-  border-radius: 7px;
-  color: #fff;
-  background: #63d37d;
-  font-size: 0.96rem;
-  font-weight: 800;
-  letter-spacing: 0;
+.recent-relay-switcher h2 {
+  font-size: 17px;
+  margin: 0 0 20px;
 }
-
-.recent-relay-action-line {
+.recent-relay-switcher > div {
+  display: flex;
+  gap: 12px;
+}
+.recent-relay-switcher button {
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.recent-relay-switcher .relay-close {
   display: block;
+  margin: 18px 0 0 auto;
+  border: 0;
+  color: var(--text-secondary);
 }
-
-.recent-relay-action:active:not(:disabled) {
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+button:focus-visible,
+[tabindex='0']:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+button {
+  transition:
+    background-color 0.16s,
+    color 0.16s,
+    transform 0.12s;
+}
+button:active:not(:disabled) {
   transform: translateY(1px);
 }
-
-.recent-relay-action:disabled {
-  cursor: wait;
-  opacity: 0.62;
-}
-
-:global(.native-android .recent-relay-switcher) {
-  width: min(100%, 286px);
-  gap: 10px;
-  padding: 10px;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-:global(.native-android .recent-relay-action) {
-  min-height: 40px;
-  padding: 0 10px;
-  font-size: 14px;
-  line-height: 1.15;
-}
-
-@media (max-width: 768px) {
-  :global(.native-ios .recent-relay-switcher) {
-    width: min(100%, 286px);
-    gap: 10px;
-    padding: 10px;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+@keyframes workspace-arrive {
+  from {
+    opacity: 0.7;
+    transform: translateY(4px);
   }
-
-  :global(.native-ios .recent-relay-action) {
-    min-height: 40px;
-    padding: 0 10px;
-    font-size: 14px;
-    line-height: 1.15;
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
-
-.command-refresh {
-  min-height: 2.2rem;
-  padding: 0 0.8rem;
-  border-radius: 7px;
-  color: var(--text-primary);
-  background: var(--bg-table-header);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.active-contact-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding-top: 1rem;
-}
-
-.active-contact-controls .command-address {
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--border-light);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
-}
-
-.active-contact-controls .command-address.external {
-  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--border-light));
-  color: var(--color-warning);
-  background: var(--surface-warning);
-}
-
-.external-access-warning {
-  color: var(--color-warning);
-  font-size: 0.66rem;
-  font-weight: 650;
-  line-height: 1.2;
-  opacity: 0.9;
-}
-
-.dashboard-grid {
-  min-height: 0;
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(310px, 0.8fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.75rem;
-  padding: 0.75rem;
-  overflow: hidden;
-}
-
-.active-contact-card,
-.previous-card,
-.server-card,
-.live-panel {
-  min-width: 0;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background: var(--bg-card);
-  box-shadow: none;
-}
-
-.active-contact-card {
-  padding: 1rem;
-  background: linear-gradient(135deg, var(--surface-accent), transparent 48%), var(--bg-card);
-}
-
-.section-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  color: var(--text-tertiary);
-  font-size: 0.78rem;
-}
-
-.active-contact-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 148px;
-  gap: 1.1rem;
-  align-items: start;
-  margin-top: 0.75rem;
-}
-
-.callsign-wrap {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.active-contact-primary h1,
-.active-contact-primary h2 {
-  font-size: clamp(3rem, 6vw, 5rem);
-  overflow-wrap: anywhere;
-}
-
-:global(html[lang='en']) .active-contact-card.idle .callsign-wrap {
-  flex-wrap: nowrap;
-}
-
-:global(html[lang='en']) .active-contact-card.idle .active-contact-primary h1,
-:global(html[lang='en']) .active-contact-card.idle .active-contact-primary h2 {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.grid-square {
-  margin-bottom: 0.45rem;
-  color: var(--text-tertiary);
-  font-size: 0.78rem;
-  font-weight: 750;
-}
-
-.contact-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.8rem;
-}
-
-.contact-tags span {
-  min-height: 1.75rem;
-  padding: 0.25rem 0.65rem;
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--bg-table-stripe) 75%, transparent);
-  font-size: 0.78rem;
-}
-
-.history-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.12rem;
-}
-
-.qso-plus-one {
-  color: #ff2d55;
-  font-weight: 900;
-  text-shadow: 0 0 12px rgb(255 45 85 / 42%);
-}
-
-.bearing-panel {
-  min-width: 0;
-  height: 148px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 0.45rem;
-  padding: 0.7rem;
-  background: rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-}
-
-.bearing-panel .compass {
-  width: 78px;
-  height: 78px;
-}
-
-.bearing-meta {
-  display: grid;
-  grid-template-rows: 1.2em 1.2em;
-  align-content: center;
-  justify-items: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 2.4em;
-  text-align: center;
-}
-
-.bearing-meta strong,
-.bearing-meta span {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: normal;
-}
-
-.bearing-meta strong {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.24rem;
-  min-height: 1.2em;
-}
-
-.bearing-direction,
-.bearing-angle,
-.bearing-distance {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bearing-angle {
-  flex: 0 0 auto;
-  color: var(--text-tertiary);
-  font-size: 0.72em;
-}
-
-:global(html[lang='en']) .bearing-meta strong,
-:global(html[lang='en']) .bearing-meta span {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.contact-details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-top: 1rem;
-}
-
-.contact-details > div,
-.contact-detail-card {
-  min-height: 4rem;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.contact-detail-card {
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.relay-detail-card:hover {
-  border-color: var(--color-primary);
-  background: var(--surface-primary);
-}
-
-.frequency-detail-card {
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.frequency-detail-card:hover {
-  border-color: var(--color-primary);
-  background: var(--surface-accent);
-}
-
-.contact-details span {
-  display: block;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-}
-
-.contact-details strong {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--text-primary);
-  font-size: 1.05rem;
-  overflow-wrap: anywhere;
-}
-
-.contact-details .frequency-line {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.98rem;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: keep-all;
-}
-
-.contact-details strong small {
-  margin-left: 0.35rem;
-  color: var(--text-tertiary);
-  font-size: 0.76rem;
-  font-weight: 650;
-}
-
-.dashboard-actions {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.dashboard-actions a {
-  display: grid;
-  min-height: 2.55rem;
-  place-items: center;
-  border: 1px solid var(--border-light);
-  border-radius: 7px;
-  color: var(--text-primary);
-  background: var(--bg-table-header);
-  font-size: 0.84rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.dashboard-actions a:hover,
-.dashboard-actions a.primary {
-  border-color: color-mix(in srgb, var(--color-primary) 52%, var(--border-light));
-  color: var(--color-primary);
-  background: var(--surface-accent);
-}
-
-.mobile-previous-card {
-  display: none;
-}
-
-.dashboard-side {
-  min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.75rem;
-}
-
-.previous-card,
-.server-card {
-  padding: 0.9rem;
-}
-
-.previous-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 0.75rem;
-  align-items: center;
-  margin-top: 0.75rem;
-}
-
-.previous-callsign {
-  color: var(--text-primary);
-  font-size: clamp(1.7rem, 3vw, 2.25rem);
-  line-height: 1;
-  overflow-wrap: anywhere;
-}
-
-.mini-bearing {
-  display: grid;
-  place-items: center;
-  gap: 0.25rem;
-  min-height: 86px;
-  padding: 0.4rem;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.07);
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  text-align: center;
-}
-
-.mini-bearing .compass {
-  width: 46px;
-  height: 46px;
-  margin-top: 0.35rem;
-}
-
-.mini-bearing .compass-arrow {
-  width: 17px;
-  height: 23px;
-}
-
-.server-card {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.server-card-header {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.server-card-header:hover {
-  color: var(--color-primary);
-}
-
-.server-list-trigger {
-  min-height: 1.9rem;
-  padding: 0.32rem 0.55rem;
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  color: var(--text-primary);
-  background: var(--bg-table-header);
-  font-size: 0.7rem;
-  text-decoration: none;
-}
-
-.server-card-header:hover .server-list-trigger {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.server-list {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  overflow: auto;
-}
-
-.server-list button {
-  position: relative;
-  display: grid;
-  min-height: 2.75rem;
-  place-items: center;
-  padding: 0.45rem;
-  border-radius: 7px;
-  color: var(--text-secondary);
-  background: var(--bg-table-stripe);
-  font-size: 0.78rem;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.server-list button.pinned {
-  padding-right: 2.9rem;
-}
-
-.station-name {
-  max-width: 100%;
-}
-
-.station-pin {
-  position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
-  padding: 0.1rem 0.25rem;
-  border-radius: 4px;
-  color: var(--color-warning);
-  background: var(--surface-warning);
-  font-size: 0.58rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.server-list button.active {
-  border-color: var(--color-success);
-  color: var(--color-success);
-  background: var(--surface-success);
-}
-
-.side-empty {
-  display: grid;
-  min-height: 4.5rem;
-  place-items: center;
-  color: var(--text-tertiary);
-  font-size: 0.8rem;
-}
-
-.dashboard-grid > .live-panel {
-  grid-column: 1 / -1;
-  min-height: 0;
-  margin: 0;
-}
-
-.live-table {
-  border-collapse: separate;
-  border-spacing: 0 0.2rem;
-  padding: 0 0.45rem 0.3rem;
-}
-
-.live-table th,
-.live-table td {
-  border-bottom: 1px solid var(--border-light);
-  background: var(--bg-table-stripe);
-}
-
-.live-table th {
-  border-bottom: 0;
-  background: var(--bg-card);
-}
-
-.live-table td:first-child {
-  border-left: 1px solid var(--border-light);
-  border-radius: 7px 0 0 7px;
-}
-
-.live-table td:last-child {
-  border-right: 1px solid var(--border-light);
-  border-radius: 0 7px 7px 0;
-}
-
-@media (min-width: 769px) {
-  .dashboard-view {
-    height: auto;
-    min-height: auto;
-    overflow: visible;
+@media (max-width: 1000px) {
+  .live-workspace {
+    padding: 16px;
+    gap: 14px;
   }
-
-  .dashboard-grid {
-    flex: none;
-    grid-template-rows: auto auto;
-    min-height: auto;
-    overflow: visible;
+  .current-contact {
+    padding: 20px;
+    gap: 18px;
   }
-
-  .dashboard-grid > .live-panel {
-    min-height: auto;
-  }
-
-  .server-list {
-    flex: none;
-    max-height: calc(3 * 3.35rem + 1rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-  }
-
-  .server-list button {
-    min-height: 3.35rem;
-  }
-
-  .dashboard-grid > .live-panel,
-  .live-panel,
-  .live-table-wrap {
-    height: auto;
-    min-height: 0;
-    overflow-y: visible;
-  }
-
-  .live-table-wrap {
-    flex: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    overflow-y: auto;
-  }
-
-  .dashboard-side {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto;
-  }
-
-  .dashboard-grid > .live-panel {
-    grid-column: 1;
-    min-height: 20rem;
-  }
-}
-
-@media (min-width: 769px) and (max-width: 1180px) {
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2 {
-    font-size: clamp(2.7rem, 5.2vw, 4.2rem);
-  }
-
-  .active-contact-main {
-    grid-template-columns: minmax(0, 1fr) 128px;
-  }
-
   .bearing-panel {
-    height: 128px;
+    width: 105px;
   }
-
-  .bearing-panel .compass {
-    width: 68px;
-    height: 68px;
-  }
-}
-
-@media (min-width: 769px) and (max-width: 1000px) {
-  .dashboard-command-bar {
-    gap: 0.45rem;
-    padding-inline: 0.55rem;
-  }
-
-  .dashboard-brand,
-  .connection-strip,
-  .command-stats,
-  .command-tools {
-    gap: 0.35rem;
-  }
-
-  .dashboard-brand strong,
-  .connection-copy strong {
-    font-size: 0.88rem;
-  }
-
-  .command-stats span {
-    font-size: 0.72rem;
-  }
-
-  .command-tool-wide {
-    padding: 0 0.45rem;
-  }
-
-  .command-select {
-    width: 6.8rem;
+  .live-table td,
+  .live-table th {
+    padding: 11px 13px;
   }
 }
-
 @media (max-width: 768px) {
-  .dashboard-view {
-    min-height: 100%;
-    padding-bottom: calc(0.5rem + var(--safe-inset-bottom, env(safe-area-inset-bottom, 0px)));
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .dashboard-command-bar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.45rem;
-    min-height: 3.65rem;
-    padding: 0.5rem 0.65rem;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: color-mix(in srgb, var(--bg-card) 96%, transparent);
-  }
-
-  .dashboard-brand {
-    display: flex;
-    min-width: max-content;
-  }
-
-  .dashboard-brand strong {
-    display: block;
-    max-width: 7.5rem;
-    overflow: hidden;
-    font-size: 0.9rem;
-    text-overflow: ellipsis;
-  }
-
-  .mobile-command-stats {
-    display: flex;
-    gap: 0.38rem;
-    margin-left: 0.1rem;
-  }
-
-  .mobile-command-stats span {
-    gap: 0.18rem;
-    font-size: 0.7rem;
-  }
-
-  .mobile-command-stats .stat-icon {
-    font-size: 0.72rem;
-    line-height: 1;
-  }
-
-  .mobile-command-stats small {
-    color: var(--text-tertiary);
-    font-size: 0.68rem;
-    font-weight: 750;
-  }
-
-  .dashboard-brand-mark {
-    width: 2.35rem;
-    height: 2.35rem;
-  }
-
-  .connection-strip {
-    display: none;
-  }
-
-  .command-stats,
-  .command-address {
-    display: none;
-  }
-
-  .command-tools {
-    display: flex;
-    flex-shrink: 0;
-    gap: 0.35rem;
-  }
-
-  .command-tools :deep(.public-tool-btn),
-  .command-tools :deep(.download-tool-btn) {
-    display: none;
-  }
-
-  .command-select-wrap {
-    display: inline-flex;
-    width: 7.1rem;
-    height: 2.25rem;
-    min-width: 0;
-    flex-shrink: 0;
-    padding: 0 0.3rem 0 0.48rem;
-  }
-
-  .command-select-wrap .tool-icon {
-    font-size: 0.72rem;
-  }
-
-  .command-select {
-    width: 100%;
-    min-width: 0;
-    font-size: 0.7rem;
-  }
-
-  .command-tool-wide {
-    width: 2.25rem;
-    padding: 0;
-  }
-
-  .command-tool-wide span:last-child {
-    display: none;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    padding: 0.5rem;
-    gap: 0.5rem;
-    overflow: visible;
-  }
-
-  .active-contact-card,
-  .previous-card,
-  .server-card {
-    padding: 0.75rem;
-  }
-
-  .active-contact-card {
-    display: grid;
-    grid-template-rows: 1.35rem 7.3rem 7.35rem 5rem;
-    gap: 0.55rem;
-    overflow: hidden;
-  }
-
-  .active-contact-card > .section-label {
-    min-height: 1.35rem;
-    overflow: hidden;
-  }
-
-  .active-contact-main {
-    grid-template-columns: minmax(0, 1fr) 104px;
-    gap: 0.65rem;
-    align-items: stretch;
-    min-height: 0;
-    height: 7.3rem;
-    margin-top: 0;
-    overflow: hidden;
-  }
-
-  .active-contact-primary {
-    min-width: 0;
-    min-height: 0;
-    display: grid;
-    grid-template-rows: 4.25rem 1.8rem;
-    align-content: start;
-    gap: 0.55rem;
-    overflow: hidden;
-  }
-
-  .active-contact-primary .callsign-wrap {
-    min-height: 4.25rem;
-    max-height: 4.25rem;
-    align-content: end;
-    align-items: flex-end;
-    gap: 0.35rem;
-    overflow: hidden;
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2 {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: clamp(2rem, 10vw, 2.85rem);
-    line-height: 1.02;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .active-contact-primary .grid-square {
-    margin-bottom: 0.18rem;
-    font-size: 0.78rem;
-    white-space: nowrap;
-  }
-
-  .active-contact-primary .active-contact-new-badge {
-    align-self: end;
-    margin-bottom: 0.18rem;
-  }
-
-  .contact-tags {
-    height: 1.8rem;
-    margin-top: 0;
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-
-  .contact-tags span {
-    min-height: 1.55rem;
-    max-width: 100%;
-    flex: 0 1 auto;
-    padding: 0.18rem 0.45rem;
-    overflow: hidden;
-    font-size: 0.72rem;
-    line-height: 1.1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .active-contact-controls {
-    display: none;
-  }
-
-  .active-contact-controls .command-refresh {
-    min-height: 2.45rem;
-    padding: 0 0.85rem;
-  }
-
-  .bearing-panel {
-    height: 104px;
-    align-self: start;
-    padding: 0.45rem;
-  }
-
-  .bearing-panel .compass {
-    width: 52px;
-    height: 52px;
-  }
-
-  .bearing-meta strong {
-    font-size: 0.75rem;
-  }
-
-  .bearing-meta span {
-    font-size: 0.64rem;
-  }
-
-  .contact-details {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(2, 3.45rem);
-    min-height: 0;
-    height: 7.35rem;
-    margin-top: 0;
-    gap: 0.45rem;
-    overflow: hidden;
-  }
-
-  .contact-details > div,
-  .contact-detail-card {
-    min-height: 0;
-    height: 3.45rem;
-    padding: 0.5rem 0.6rem;
-    overflow: hidden;
-  }
-
-  .frequency-detail-card {
-    border-color: color-mix(in srgb, var(--color-primary) 62%, var(--border-light));
-    background: color-mix(in srgb, var(--surface-accent) 58%, transparent);
-  }
-
-  .contact-details strong {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 0.85rem;
-    line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .contact-details .frequency-line {
-    font-size: clamp(0.72rem, 3vw, 0.84rem);
-  }
-
-  .dashboard-actions {
-    display: none;
-  }
-
-  .server-card {
-    display: none;
-  }
-
-  .dashboard-side {
-    display: none;
-  }
-
-  .previous-main {
-    grid-template-columns: 1fr;
-  }
-
-  .previous-card {
-    display: none;
-  }
-
-  .mobile-previous-card {
-    display: grid;
-    grid-template-rows: 1.25rem minmax(0, 1fr);
-    gap: 0.35rem;
-    height: 5rem;
-    margin-top: 0;
-    padding: 0.6rem;
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--bg-table-stripe) 72%, transparent);
-    overflow: hidden;
-  }
-
-  .mobile-previous-main {
-    display: grid;
-    min-height: 0;
-    gap: 0.35rem;
-    overflow: hidden;
-  }
-
-  .mobile-previous-identity {
-    display: flex;
-    align-items: baseline;
-    gap: 0.55rem;
-    min-width: 0;
-  }
-
-  .mobile-previous-identity strong {
-    overflow: hidden;
-    color: var(--text-primary);
-    font-size: 1.25rem;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mobile-previous-identity span {
-    color: var(--text-tertiary);
-    font-size: 0.76rem;
-    font-weight: 750;
-    white-space: nowrap;
-  }
-
-  .mobile-previous-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.32rem;
-    max-height: 1.6rem;
-    overflow: hidden;
-  }
-
-  .mobile-previous-meta span,
-  .mobile-previous-empty {
-    min-height: 1.45rem;
-    padding: 0.18rem 0.45rem;
-    border: 1px solid var(--border-light);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    background: color-mix(in srgb, var(--bg-card) 72%, transparent);
-    font-size: 0.68rem;
-    line-height: 1.25;
-  }
-
-  .mini-bearing {
-    display: none;
-  }
-
-  .live-table {
-    min-width: 560px;
-  }
-
-  .live-table-wrap {
-    max-height: 58vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .live-table th:nth-child(4),
-  .live-table td:nth-child(4),
-  .live-table th:nth-child(5),
-  .live-table td:nth-child(5) {
-    display: none;
-  }
-
-  .time-cell {
-    width: 92px;
-  }
-
-  .qth-cell {
-    width: 150px;
-  }
-
-  .relay-cell {
-    width: 122px;
-  }
-}
-
-@media (orientation: portrait) and (max-width: 1024px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-    overflow-y: auto;
-  }
-
-  .dashboard-side {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-  }
-
-  .dashboard-grid > .live-panel {
-    grid-column: 1;
-  }
-
-  .server-card {
-    display: none;
-  }
-}
-
-@media (max-width: 430px) {
-  .connection-copy strong {
-    font-size: 0.88rem;
-  }
-
-  .dashboard-command-bar {
-    min-height: 3.35rem;
-    padding: 0.45rem 0.55rem;
-  }
-
-  .dashboard-brand {
-    gap: 0.45rem;
-  }
-
-  .dashboard-brand strong {
-    display: none;
-  }
-
-  .mobile-command-stats {
-    gap: 0.32rem;
+  .live-workspace {
+    padding: 12px;
+    gap: 12px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .current-contact {
+    padding: 18px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .callsign-line h1 {
+    font-size: 34px;
+    letter-spacing: -1px;
+  }
+  .callsign-line {
+    gap: 7px;
+    margin-top: 12px;
+  }
+  .grid-label {
+    font-size: 12px;
+  }
+  .contact-location {
+    font-size: 13px;
+    gap: 5px 10px;
+  }
+  .contact-meta {
+    font-size: 12px;
+    gap: 8px 14px;
+    margin-top: 13px;
+  }
+  .previous-line {
+    font-size: 12px;
+    gap: 6px 10px;
+    margin-top: 15px;
+    padding-top: 12px;
+  }
+  .previous-line time {
     margin-left: 0;
   }
-
-  .mobile-command-stats span {
-    font-size: 0.68rem;
-  }
-
-  .mobile-command-stats .stat-icon {
-    font-size: 0.68rem;
-  }
-
-  .mobile-command-stats small {
-    font-size: 0.66rem;
-  }
-
-  .dashboard-brand-mark,
-  .command-tool {
-    width: 2.05rem;
-    height: 2.05rem;
-  }
-
-  .command-tools {
-    gap: 0.25rem;
-  }
-
-  .recent-relay-switcher {
-    width: min(100%, 19.5rem);
-    gap: 0.6rem;
-    padding: 0.58rem;
-  }
-
-  .recent-relay-action {
-    min-height: 2.75rem;
-    font-size: 0.9rem;
-  }
-
-  .command-select-wrap {
-    width: 6.45rem;
-    height: 2.05rem;
-    padding-left: 0.4rem;
-  }
-
-  .command-select {
-    font-size: 0.66rem;
-  }
-
-  .active-contact-card,
-  .previous-card,
-  .server-card {
-    padding: 0.65rem;
-  }
-
-  .active-contact-main {
-    grid-template-columns: minmax(0, 1fr) 92px;
-    gap: 0.5rem;
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2 {
-    font-size: clamp(1.85rem, 11vw, 2.55rem);
-  }
-
-  .contact-tags {
-    gap: 0.35rem;
-    margin-top: 0.55rem;
-  }
-
-  .contact-tags span {
-    min-height: 1.55rem;
-    padding: 0.18rem 0.45rem;
-    font-size: 0.7rem;
-  }
-
   .bearing-panel {
-    height: 92px;
+    width: 72px;
+    font-size: 12px;
+    padding-top: 22px;
   }
-
-  .bearing-panel .compass {
-    width: 44px;
-    height: 44px;
+  .compass {
+    width: 62px;
+    height: 62px;
   }
-
-  .dashboard-actions {
+  .compass-arrow {
+    width: 17px;
+    height: 24px;
+  }
+  .bearing-panel > span {
+    font-size: 12px;
+  }
+  .panel-heading {
+    padding: 14px 15px;
+  }
+  .panel-heading > div {
+    gap: 5px;
+  }
+  .panel-heading h2 {
+    font-size: 16px;
+    width: 100%;
+  }
+  .panel-heading span {
+    font-size: 12px;
+  }
+  .panel-footer {
+    padding: 8px 15px;
+    font-size: 12px;
+  }
+  .comment-column,
+  .mode-column,
+  .relay-column,
+  .desktop-label {
     display: none;
   }
-
-  .dashboard-actions a {
-    min-height: 2.1rem;
-    font-size: 0.7rem;
+  .mobile-label {
+    display: inline;
   }
-
-  .server-list {
-    max-height: 11.5rem;
-  }
-
-  .live-table {
-    min-width: 520px;
-  }
-}
-
-/* Portrait cards must grow with QTH text instead of clipping the final row. */
-@media (max-width: 768px) and (orientation: portrait) {
-  .active-contact-card {
-    grid-template-rows: 1.35rem 7.3rem 7.35rem auto;
-  }
-
-  .mobile-previous-card {
-    height: auto;
-    min-height: 5rem;
-    grid-template-rows: auto auto;
-    overflow: visible;
-  }
-
-  .mobile-previous-main {
-    min-width: 0;
-    align-content: start;
-    overflow: visible;
-  }
-
-  .mobile-previous-meta {
-    max-height: none;
-    overflow: visible;
-  }
-
-  .mobile-previous-meta .qth-tag {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    line-height: 1.4;
-  }
-
-  .active-contact-card.idle .active-contact-primary h1 {
-    font-size: clamp(1.25rem, 5.6vw, 1.7rem);
-  }
-}
-
-@media (max-width: 768px) and (orientation: landscape) {
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.62fr);
-    grid-template-rows: auto auto;
-    align-items: start;
-  }
-
-  .active-contact-card {
-    grid-column: 1 / -1;
-    grid-template-rows: 1.1rem 5.15rem 3.45rem 5.25rem;
-    gap: 0.35rem;
-  }
-
-  .active-contact-main {
-    grid-template-columns: minmax(0, 1fr) 118px;
-    height: 5.15rem;
-  }
-
-  .active-contact-primary {
-    grid-template-rows: 3.1rem 1.4rem;
-    gap: 0.35rem;
-  }
-
-  .active-contact-primary .callsign-wrap {
-    min-height: 3.1rem;
-    max-height: 3.1rem;
-  }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2 {
-    font-size: clamp(2rem, 8vw, 2.8rem);
-  }
-
-  .contact-tags {
-    height: 1.4rem;
-  }
-
-  .contact-tags span {
-    min-height: 1.28rem;
-  }
-
-  .active-contact-controls {
-    display: none;
-  }
-
-  .active-contact-controls .command-refresh {
-    min-height: 1.9rem;
-  }
-
-  .contact-details {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: 3.45rem;
-    height: 3.45rem;
-  }
-
-  .mobile-previous-main {
-    grid-template-columns: minmax(0, 0.36fr) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .mobile-previous-card {
-    height: 5.25rem;
-  }
-
-  .mobile-previous-meta {
-    max-height: 2.8rem;
-  }
-
-  .mobile-previous-meta .qth-tag {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-
-  .live-panel {
-    grid-column: 1 / -1;
-  }
-
-  .live-table-wrap {
-    max-height: 54vh;
-  }
-}
-
-@media (max-height: 520px) and (max-width: 950px) and (orientation: landscape) {
-  .dashboard-view {
-    height: auto;
-    min-height: auto;
-    gap: 0.22rem;
-    overflow: visible;
-    padding-bottom: 2.55rem;
-  }
-
-  .dashboard-command-bar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    min-height: 2.42rem;
-    padding: 0.22rem 0.38rem;
-  }
-
-  .dashboard-brand strong {
+  .mobile-relay-link {
     display: block;
-    max-width: 6.4rem;
-    overflow: hidden;
-    font-size: 0.82rem;
-    text-overflow: ellipsis;
+    margin-top: 5px;
+    line-height: 1.5;
   }
-
-  .dashboard-brand-mark {
-    width: 1.72rem;
-    height: 1.72rem;
+  .time-cell {
+    white-space: nowrap;
   }
-
-  .connection-strip,
-  .command-stats,
-  .command-tools :deep(.public-tool-btn),
-  .command-tools :deep(.download-tool-btn) {
-    display: none;
+  .live-table {
+    font-size: 12px;
   }
-
-  .command-tool-wide {
-    width: 1.76rem;
-    height: 1.76rem;
-    padding: 0;
+  .live-table th:nth-child(1) {
+    width: 25%;
   }
-
-  .command-tool-wide span:last-child {
-    display: none;
+  .live-table th:nth-child(2) {
+    width: 28%;
   }
-
-  .command-select-wrap {
-    width: 6.1rem;
-    height: 1.76rem;
-    padding-left: 0.38rem;
+  .live-table th:nth-child(3) {
+    width: 47%;
   }
-
-  .command-select {
-    font-size: 0.64rem;
+  .live-table td,
+  .live-table th {
+    padding: 10px 9px;
   }
-
-  .command-tool {
-    width: 1.76rem;
-    height: 1.76rem;
+  .live-table td small {
+    font-size: 12px;
   }
-
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    gap: 0.25rem;
-    padding: 0.25rem;
-    overflow: visible;
+  .row-speaking {
+    display: block;
+    margin: 3px 0 0;
+    font-size: 12px;
   }
-
-  .active-contact-card {
-    padding: 0.38rem;
-    grid-template-rows: 1rem 5.45rem 2.35rem 4.65rem;
-    gap: 0.22rem;
+}
+@media (max-height: 650px) {
+  .live-workspace {
+    grid-template-rows: minmax(160px, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
   }
-
-  .section-label {
-    margin-bottom: 0.2rem;
-    font-size: 0.62rem;
-    line-height: 1.1;
+  .current-contact {
+    padding: 16px 20px;
   }
-
-  .active-contact-main {
-    grid-template-columns: minmax(0, 1fr) 84px;
-    gap: 0.32rem;
-    height: 5.45rem;
+  .callsign-line h1 {
+    font-size: 42px;
   }
-
-  .active-contact-primary {
-    grid-template-columns: minmax(0, max-content) auto;
-    grid-template-rows: auto minmax(0.2rem, 1fr) auto;
-    min-height: 92px;
-    align-content: stretch;
-    align-items: end;
-    column-gap: 0.28rem;
-    row-gap: 0.12rem;
+  .contact-meta {
+    margin-top: 10px;
   }
-
-  .active-contact-primary .callsign-wrap {
-    grid-row: 1;
-    grid-column: 1 / -1;
-    align-self: start;
+  .previous-line {
+    margin-top: 12px;
+    padding-top: 10px;
   }
-
-  .active-contact-primary h1,
-  .active-contact-primary h2 {
-    font-size: clamp(56px, 15vw, 84px);
-    line-height: 0.9;
-  }
-
-  .contact-tags {
-    grid-row: 3;
-    grid-column: 1;
-    justify-self: start;
-    gap: 0.2rem;
-    margin-top: 0;
-  }
-
-  .contact-tags span {
-    min-height: 1.08rem;
-    padding: 0.08rem 0.28rem;
-    font-size: 0.58rem;
-    line-height: 1.12;
-  }
-
-  .active-contact-controls {
-    display: none;
-  }
-
-  .command-refresh {
-    min-height: 1.72rem;
-    padding: 0.12rem 0.45rem;
-    font-size: 0.62rem;
-  }
-
   .bearing-panel {
-    height: 72px;
-    padding: 0.28rem;
-    gap: 0.24rem;
+    width: 94px;
   }
-
-  .bearing-panel .compass {
-    width: 34px;
-    height: 34px;
+  .compass {
+    width: 64px;
+    height: 64px;
   }
-
-  .bearing-meta strong {
-    font-size: 0.62rem;
+}
+@media (max-height: 520px) {
+  .live-workspace {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    grid-template-rows: auto minmax(240px, auto);
   }
-
-  .bearing-meta span {
-    font-size: 0.52rem;
-  }
-
-  .contact-details {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: 2.35rem;
-    height: 2.35rem;
-    gap: 0.24rem;
-    margin-top: 0.25rem;
-  }
-
-  .contact-detail-card {
-    min-height: 2.04rem;
-    height: 2.35rem;
-    padding: 0.24rem 0.38rem;
-  }
-
-  .contact-details span {
-    font-size: 0.56rem;
-  }
-
-  .contact-details strong {
-    margin-top: 0.12rem;
-    font-size: 0.68rem;
-  }
-
-  .contact-details .frequency-line {
-    font-size: clamp(0.62rem, 2.2vw, 0.72rem);
-  }
-
-  .dashboard-actions,
-  .dashboard-side,
-  .previous-card,
-  .server-card {
-    display: none;
-  }
-
-  .mobile-previous-card {
-    display: grid;
-    grid-template-rows: 1rem minmax(0, 1fr);
-    gap: 0.18rem;
-    height: 4.65rem;
-    margin-top: 0.24rem;
-    padding: 0.3rem 0.34rem;
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--bg-table-stripe) 72%, transparent);
-  }
-
-  .mobile-previous-main {
-    grid-template-columns: minmax(0, 0.34fr) minmax(0, 1fr);
-    align-items: start;
-    gap: 0.28rem;
-  }
-
-  .mobile-previous-identity strong {
-    font-size: 0.92rem;
-  }
-
-  .mobile-previous-identity span {
-    font-size: 0.56rem;
-  }
-
-  .mobile-previous-meta {
-    gap: 0.18rem;
-    max-height: 2.5rem;
-    overflow: hidden;
-  }
-
-  .mobile-previous-meta span,
-  .mobile-previous-empty {
-    min-height: 1.04rem;
-    padding: 0.08rem 0.28rem;
-    font-size: 0.56rem;
-    line-height: 1.1;
-  }
-
-  .mobile-previous-meta .qth-tag {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-
-  .live-panel {
-    grid-column: 1;
-    min-height: 12rem;
-  }
-
-  .live-table-wrap {
+  .current-contact {
     max-height: none;
-    overflow: auto;
+    min-height: 220px;
   }
 }
-
-@media (max-width: 768px) {
-  :global(.native-android .active-contact-card) {
-    grid-template-rows: 1.35rem 9.45rem 7.35rem 7.35rem;
+@media (prefers-reduced-motion: reduce) {
+  .live-workspace {
+    animation: none;
   }
-
-  :global(.native-android .active-contact-main) {
-    grid-template-columns: minmax(0, 1fr) 104px;
-    height: 9.45rem;
-  }
-
-  :global(.native-android .active-contact-primary) {
-    grid-template-rows: 4.7rem 3rem 0;
-    gap: 0.55rem;
-  }
-
-  :global(.native-android .active-contact-primary .callsign-wrap) {
-    min-height: 4.7rem;
-    max-height: 4.7rem;
-  }
-
-  :global(.native-android .contact-tags) {
-    height: 3rem;
-    align-content: start;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-    margin-top: 0;
-  }
-
-  :global(.native-android .contact-tags span) {
-    min-height: 1.28rem;
-    padding: 0.14rem 0.42rem;
-    font-size: 0.66rem;
-    line-height: 1.1;
-  }
-
-  :global(.native-android .contact-tags .contact-status-tag),
-  :global(.native-android .contact-tags .history-count) {
-    flex: 0 0 auto;
-    max-width: none;
-    text-overflow: clip;
-  }
-
-  :global(.native-android .contact-tags .qth-tag) {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-
-  :global(.native-android .active-contact-controls) {
-    display: none;
-  }
-
-  :global(.native-android .bearing-panel) {
-    height: 104px;
-    min-height: 104px;
-    padding: 0.5rem 0.42rem;
-    gap: 0.25rem;
-  }
-
-  :global(.native-android .bearing-panel .compass) {
-    width: 48px;
-    height: 48px;
-  }
-
-  :global(.native-android .bearing-meta) {
-    display: grid;
-    gap: 0.1rem;
-    justify-items: center;
-  }
-
-  :global(.native-android .bearing-meta strong),
-  :global(.native-android .bearing-meta span) {
-    line-height: 1.05;
-  }
-
-  :global(.native-android .mobile-previous-card) {
-    height: 7.35rem;
-    grid-template-rows: 1.25rem minmax(0, 1fr);
-  }
-
-  :global(.native-android .mobile-previous-main) {
-    gap: 0.38rem;
-    align-content: start;
-  }
-
-  :global(.native-android .mobile-previous-meta) {
-    align-content: start;
-    gap: 0.28rem;
-    max-height: 3.45rem;
-  }
-
-  :global(.native-android .mobile-previous-meta span) {
-    min-height: 1.32rem;
-    padding: 0.12rem 0.42rem;
-    font-size: 0.64rem;
-    line-height: 1.12;
-  }
-
-  :global(.native-android .mobile-previous-meta .history-count) {
-    flex: 0 0 auto;
-  }
-
-  :global(.native-android .mobile-previous-meta .qth-tag) {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 768px) and (orientation: landscape) {
-  :global(.native-android .active-contact-card) {
-    grid-template-rows: 1.1rem 5.75rem 3.45rem 4.7rem;
-  }
-
-  :global(.native-android .active-contact-main) {
-    height: 5.75rem;
-  }
-
-  :global(.native-android .active-contact-primary) {
-    grid-template-rows: 3.35rem 1.45rem;
-  }
-
-  :global(.native-android .active-contact-primary .callsign-wrap) {
-    min-height: 3.35rem;
-    max-height: 3.35rem;
-  }
-
-  :global(.native-android .active-contact-controls) {
-    display: none;
-  }
-
-  :global(.native-android .contact-tags) {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    height: 1.45rem;
-    align-content: start;
-    overflow: hidden;
-  }
-
-  :global(.native-android .contact-tags .qth-tag) {
-    display: none;
-  }
-
-  :global(.native-android .mobile-previous-card) {
-    height: 4.7rem;
-  }
-
-  :global(.native-android .mobile-previous-meta) {
-    max-height: 2rem;
-  }
-}
-
-@media (max-height: 520px) and (max-width: 950px) and (orientation: landscape) {
-  :global(.native-android .active-contact-card) {
-    grid-template-rows: 1rem 5.05rem 2.95rem 4.95rem;
-  }
-
-  :global(.native-android .active-contact-main) {
-    height: 5.05rem;
-  }
-
-  :global(.native-android .active-contact-primary) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 3.55rem 1.12rem;
-    min-height: 0;
-    align-content: start;
-  }
-
-  :global(.native-android .active-contact-primary .callsign-wrap) {
-    min-height: 3.55rem;
-    max-height: 3.55rem;
-  }
-
-  :global(.native-android .active-contact-controls) {
-    display: none;
-  }
-
-  :global(.native-android .contact-tags) {
-    grid-row: 2;
-    grid-column: 1;
-    height: 1.12rem;
-    align-content: start;
-    overflow: hidden;
-  }
-
-  :global(.native-android .contact-tags .qth-tag) {
-    display: none;
-  }
-
-  :global(.native-android .mobile-previous-card) {
-    height: 4.95rem;
-  }
-
-  :global(.native-android .mobile-previous-meta) {
-    max-height: 2.05rem;
+  button,
+  .compass-arrow {
+    transition: none;
   }
 }
 </style>

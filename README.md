@@ -2,6 +2,14 @@
 
 FMO 仪表盘是面向 FMO 用户的实时通联看板，基于 FmoLogs 数据与 FMO WebSocket 接口增强而来。它把常用信息放在第一屏：当前发言、最近通联、友台位置、相对方位、距离、服务器状态、播报模式和通联统计。
 
+仪表盘（`/dashboard`，默认入口）内可通过 Tab 切换实时通联和通联足迹。足迹地址为 `/dashboard?view=footprints`，旧的 `/map` 自动跳转。各页面共用主导航，支持从其他菜单直接返回足迹；仪表盘 Tab 来回切换会保留地图和筛选状态。
+
+通联足迹支持省级地域、城市和 Maidenhead 网格切换，并可定位正在讲话的友台。点亮依据是已保存的通联位置证据，讲话事件或 APRS 最近位置不会自动计入成就；粗网格也不会被扩展成细格。顶部“设备信息”抽屉展示设备呼号、UID、中继、地址和可用坐标，接口缺少的频率显示为“未提供”。行政边界来自 DataV.GeoAtlas，首次加载需要联网，后续可使用本地缓存。地图核心回归检查：`npm run test:map`。
+
+足迹页固定在窗口内，桌面由地图和右侧地域详情组成，时间线与记录表在详情区内滚动。手机通过底部摘要打开地域与通联详情层；设备信息统一放在顶部抽屉，避免地图被多层导航挤压。
+
+全局设备顶栏和“更多 → FMO 控制”支持直接读取、切换盒子的标准/待机模式，使用当前选择的 FMO 地址，不需要 APRS 密钥。切换后会读取设备状态确认结果；未确认时显示未知和错误提示。协议回归检查：`npm run test:device-control`。
+
 项目当前以 V2 为主线，覆盖 Web、Android、iOS、Windows 和 macOS。Windows / macOS 桌面版基于 Tauri 打包，不依赖外部浏览器，适合遇到浏览器自动 HTTPS、安全连接策略或环境兼容问题的用户。
 
 [项目仓库](https://github.com/54dashayu/FMO-Dashboard) · [GitHub Release](https://github.com/54dashayu/FMO-Dashboard/releases/tag/v2.0.2) · [问题反馈](https://github.com/54dashayu/FMO-Dashboard/issues)

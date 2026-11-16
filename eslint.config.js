@@ -43,6 +43,8 @@ export default [
   },
   {
     ignores: [
+      '.oil-ui/**',
+      'src-tauri/target/**',
       'dist/**',
       'build/**',
       'node_modules/**',

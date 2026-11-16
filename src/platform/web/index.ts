@@ -1,3 +1,4 @@
+import { WebRelayStatusService } from './RelayStatusService.web'
 import type { Platform } from '../index'
 import { webCapabilities } from './Capabilities.web'
 import { WebGridService } from './GridService.web'
@@ -8,9 +9,14 @@ import { WebEventsService } from './EventsService.web'
 import { WebLocationService } from './LocationService.web'
 import { WebStorageService } from './StorageService.web'
 import { WebStationLocationService } from './StationLocationService.web'
+import { WebMapService } from './MapService.web'
+import { WebDeviceControlService } from './DeviceControlService.web'
 
 export function createWebPlatform(): Platform {
   return {
+    relayStatus: new WebRelayStatusService(),
+    deviceControl: new WebDeviceControlService(),
+    map: new WebMapService(),
     events: new WebEventsService(),
     audio: new WebAudioService(),
     aprs: new WebAprsService(),

@@ -1,3 +1,4 @@
+import { WebRelayStatusService } from '../web/RelayStatusService.web'
 import type { Platform } from '../index'
 import { nativeCapabilities } from './Capabilities.native'
 import { NativeGridService } from './GridService.native'
@@ -8,9 +9,14 @@ import { NativeEventsService } from './EventsService.native'
 import { NativeLocationService } from './LocationService.native'
 import { NativeStorageService } from './StorageService.native'
 import { NativeStationLocationService } from './StationLocationService.native'
+import { WebMapService } from '../web/MapService.web'
+import { WebDeviceControlService } from '../web/DeviceControlService.web'
 
 export function createNativePlatform(): Platform {
   return {
+    relayStatus: new WebRelayStatusService(),
+    deviceControl: new WebDeviceControlService(),
+    map: new WebMapService(),
     events: new NativeEventsService(),
     audio: new NativeAudioService(),
     aprs: new NativeAprsService(),

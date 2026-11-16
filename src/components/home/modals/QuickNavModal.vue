@@ -12,7 +12,7 @@
             :key="navRoute.path"
             :to="navRoute.path"
             class="nav-item"
-            :class="{ active: currentRoute === navRoute.path }"
+            :class="{ active: isNavigationActive(route, navRoute) }"
             @click="handleNavClick"
           >
             <SvgIcon :name="navRoute.icon" :size="20" class="nav-icon" />
@@ -25,11 +25,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ALL_PAGE_ROUTES } from '../constants'
 import SvgIcon from '../../common/SvgIcon.vue'
 import { useLocale } from '../../../composables/useLocale'
+import { isNavigationActive } from '../../../core/navigation'
 
 defineProps({
   visible: {
@@ -46,8 +46,6 @@ const emit = defineEmits(['close'])
 
 const route = useRoute()
 const { t, isEnglish } = useLocale()
-
-const currentRoute = computed(() => route.path)
 
 function routeLabel(navRoute) {
   return isEnglish.value ? t(`nav.${navRoute.type}`, navRoute.label) : navRoute.label

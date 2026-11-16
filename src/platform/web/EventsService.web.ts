@@ -8,8 +8,8 @@ import { FmoApiClient } from '../../services/fmoApi'
  *
  * 职责：
  * - 维护多 addressId 的 WebSocket 连接
- * - 掉线自动重连（5 秒退避）
- * - 主地址（primary）每 30s 轮询 station:getCurrent，得到 serverInfo 后推送
+ * - 掉线自动重连（2.5–30 秒退避），网络恢复／回到前台时补连
+ * - 每个订阅地址每 30s 轮询 station:getCurrent，得到 serverInfo 后推送
  * - 转发 onMessage / onStatus / onServerInfo 事件给上层（speakingStore）
  *
  * 不关心业务语义（发言状态、host 标记、历史去重等），纯通道。
@@ -19,9 +19,21 @@ export class WebEventsService implements IEventsService {
   private configs = new Map<string, EventsConnectConfig>()
   private reconnectTimers = new Map<string, any>()
   private reconnectAttempts = new Map<string, number>()
+  private connectTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private serverInfoTimers = new Map<string, any>()
   private primaryAddressId: string | null = null
   private manualDisconnect = new Set<string>()
+  private recoveryBound = false
+  private recoverConnections = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    for (const addressId of this.configs.keys()) {
+      const ws = this.connections.get(addressId)
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING))
+        continue
+      this.clearReconnectTimer(addressId)
+      this.openSocket(addressId)
+    }
+  }
 
   private msgListeners = new Set<(addressId: string, data: string) => void>()
   private statusListeners = new Set<(addressId: string, s: EventsStatus) => void>()
@@ -30,14 +42,25 @@ export class WebEventsService implements IEventsService {
   // ========== 公有 API ==========
   async connect(cfg: EventsConnectConfig): Promise<void> {
     const existing = this.connections.get(cfg.addressId)
+    const previous = this.configs.get(cfg.addressId)
     if (
       existing &&
+      previous?.url === cfg.url &&
+      previous?.apiUrl === cfg.apiUrl &&
       (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)
     ) {
+      this.emitStatus(
+        cfg.addressId,
+        existing.readyState === WebSocket.OPEN ? 'connected' : 'connecting'
+      )
       return
     }
+    this.clearReconnectTimer(cfg.addressId)
+    this.stopServerInfoPolling(cfg.addressId)
+    this.retireSocket(cfg.addressId)
     this.configs.set(cfg.addressId, cfg)
     this.manualDisconnect.delete(cfg.addressId)
+    this.bindRecovery()
     this.openSocket(cfg.addressId)
   }
 
@@ -46,25 +69,19 @@ export class WebEventsService implements IEventsService {
     this.clearReconnectTimer(addressId)
     this.stopServerInfoPolling(addressId)
 
-    const ws = this.connections.get(addressId)
-    if (ws) {
-      try {
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          ws.close()
-        }
-      } catch {
-        /* ignore */
-      }
-      this.connections.delete(addressId)
-    }
     this.configs.delete(addressId)
+    this.retireSocket(addressId)
     this.reconnectAttempts.delete(addressId)
     if (this.primaryAddressId === addressId) this.primaryAddressId = null
+    this.emitStatus(addressId, 'disconnected')
+    if (!this.configs.size) this.unbindRecovery()
   }
 
   async disconnectAll(): Promise<void> {
-    const ids = Array.from(this.connections.keys())
-    for (const id of ids) await this.disconnect(id)
+    // Clear the whole old session before the caller can create its replacement.
+    // Awaiting each ID here lets an old loop close newly created sockets with the same ID.
+    const ids = Array.from(this.configs.keys())
+    for (const id of ids) void this.disconnect(id)
     this.primaryAddressId = null
   }
 
@@ -101,55 +118,99 @@ export class WebEventsService implements IEventsService {
   // ========== 内部：WebSocket 管理 ==========
   private openSocket(addressId: string) {
     const cfg = this.configs.get(addressId)
-    if (!cfg) return
+    if (!cfg || this.manualDisconnect.has(addressId)) return
+    this.retireSocket(addressId)
+    this.emitStatus(addressId, 'connecting')
 
     let ws: WebSocket
     try {
       ws = new WebSocket(cfg.url)
     } catch (err) {
       console.warn(`[Events][${addressId}] new WebSocket failed`, err)
+      this.emitStatus(addressId, 'reconnecting')
       this.scheduleReconnect(addressId)
       return
     }
     this.connections.set(addressId, ws)
 
+    const current = () =>
+      this.connections.get(addressId) === ws && this.configs.get(addressId) === cfg
     const connectTimeout = setTimeout(() => {
-      if (ws.readyState === WebSocket.CONNECTING) {
-        try {
-          ws.close()
-        } catch {
-          /* ignore */
-        }
+      if (current() && ws.readyState === WebSocket.CONNECTING) {
+        this.retireSocket(addressId)
+        this.emitStatus(addressId, 'reconnecting')
+        this.scheduleReconnect(addressId)
       }
     }, 12000)
+    this.connectTimers.set(addressId, connectTimeout)
 
     ws.onopen = () => {
-      clearTimeout(connectTimeout)
+      if (!current()) return
+      this.clearConnectTimer(addressId)
       this.clearReconnectTimer(addressId)
       this.reconnectAttempts.delete(addressId)
       this.emitStatus(addressId, 'connected')
       this.startServerInfoPolling(addressId)
     }
     ws.onmessage = (ev) => {
+      if (!current()) return
       this.emitMessage(addressId, String(ev.data))
     }
     ws.onclose = () => {
-      clearTimeout(connectTimeout)
+      if (!current()) return
+      this.clearConnectTimer(addressId)
+      this.connections.delete(addressId)
       this.stopServerInfoPolling(addressId)
-      if (this.manualDisconnect.has(addressId)) {
-        this.emitStatus(addressId, 'disconnected')
-      } else {
-        this.emitStatus(addressId, 'reconnecting')
-        this.scheduleReconnect(addressId)
-      }
+      this.emitStatus(addressId, 'reconnecting')
+      this.scheduleReconnect(addressId)
     }
     ws.onerror = () => {
       /* onclose 会接管 */
     }
   }
 
+  private clearConnectTimer(addressId: string) {
+    const timer = this.connectTimers.get(addressId)
+    if (timer !== undefined) clearTimeout(timer)
+    this.connectTimers.delete(addressId)
+  }
+
+  private retireSocket(addressId: string) {
+    this.clearConnectTimer(addressId)
+    const ws = this.connections.get(addressId)
+    this.connections.delete(addressId)
+    if (!ws) return
+    ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null
+    try {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close()
+    } catch {
+      /* A failed close must not prevent a replacement connection. */
+    }
+  }
+
+  private bindRecovery() {
+    if (this.recoveryBound || typeof window === 'undefined') return
+    window.addEventListener('online', this.recoverConnections)
+    window.addEventListener('focus', this.recoverConnections)
+    document.addEventListener('visibilitychange', this.recoverConnections)
+    this.recoveryBound = true
+  }
+
+  private unbindRecovery() {
+    if (!this.recoveryBound) return
+    window.removeEventListener('online', this.recoverConnections)
+    window.removeEventListener('focus', this.recoverConnections)
+    document.removeEventListener('visibilitychange', this.recoverConnections)
+    this.recoveryBound = false
+  }
+
   private scheduleReconnect(addressId: string) {
-    if (this.reconnectTimers.has(addressId)) return
+    if (
+      !this.configs.has(addressId) ||
+      this.manualDisconnect.has(addressId) ||
+      this.reconnectTimers.has(addressId)
+    )
+      return
     const attempt = this.reconnectAttempts.get(addressId) || 0
     const delay = Math.min(30000, 2500 * 2 ** attempt)
     this.reconnectAttempts.set(addressId, attempt + 1)
@@ -196,8 +257,9 @@ export class WebEventsService implements IEventsService {
     try {
       client = new FmoApiClient(cfg.apiUrl)
       await client.connect()
+      if (this.configs.get(addressId) !== cfg) return
       const data = await client.getCurrentStation()
-      if (data && data.uid) {
+      if (this.configs.get(addressId) === cfg && data && data.uid) {
         this.emitServerInfo(addressId, { ...data, uid: data.uid, name: data.name || '' })
       }
     } catch (err: any) {

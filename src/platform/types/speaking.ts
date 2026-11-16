@@ -15,7 +15,7 @@ export interface SpeakingRecord {
   [k: string]: any
 }
 
-export type EventsStatus = 'connected' | 'reconnecting' | 'disconnected'
+export type EventsStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
 
 export interface EventsSnapshotConnection {
   addressId: string

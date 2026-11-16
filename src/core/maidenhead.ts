@@ -2,11 +2,7 @@
  * 将 WGS84 经纬度转换为 Maidenhead 网格。
  * 当前地址反查只需要 8 位精度，约为数百米范围。
  */
-export function coordinatesToMaidenhead(
-  latitude: number,
-  longitude: number,
-  length = 8
-): string {
+export function coordinatesToMaidenhead(latitude: number, longitude: number, length = 8): string {
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error('纬度必须在 -90 到 90 之间')
   }
@@ -18,8 +14,8 @@ export function coordinatesToMaidenhead(
   }
 
   // 180°/90° 位于编码范围的开区间上界，向内收敛避免索引越界。
-  let lon = Math.min(longitude + 180, 360 - Number.EPSILON)
-  let lat = Math.min(latitude + 90, 180 - Number.EPSILON)
+  let lon = Math.min(longitude + 180, 360 - 1e-9)
+  let lat = Math.min(latitude + 90, 180 - 1e-9)
 
   let grid = ''
   grid += String.fromCharCode(65 + Math.floor(lon / 20))

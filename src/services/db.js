@@ -1,6 +1,7 @@
 import sqlAsmUrl from 'sql.js/dist/sql-asm.js?url'
 import { AdifFormatter, AdifParser } from '../adif/index.js'
 import { exportFile } from '../utils/exportFile.js'
+import { getPlatform } from '../platform'
 
 let SQL = null
 let sqlAsmLoader = null
@@ -707,15 +708,19 @@ async function writeRecordsToStore(storeName, records) {
       putRequest.onsuccess = () => {
         imported++
         pending--
-        if (pending === 0) resolve(imported)
       }
 
       putRequest.onerror = () => {
         pending--
-        if (pending === 0) resolve(imported)
       }
     }
 
+    tx.oncomplete = () => {
+      getPlatform()
+        .map.remember(records)
+        .then(() => resolve(imported), reject)
+    }
+    tx.onabort = () => reject(tx.error || new Error('日志保存已中止'))
     tx.onerror = () => reject(tx.error)
   })
 }
@@ -1049,10 +1054,10 @@ export async function clearIndexedDBData() {
     // 删除整个数据库
     const deleteRequest = indexedDB.deleteDatabase(LOGS_DB_NAME)
     deleteRequest.onerror = () => reject(deleteRequest.error)
-    deleteRequest.onsuccess = () => resolve()
+    deleteRequest.onsuccess = () => getPlatform().map.clearEvidence().then(resolve, reject)
     deleteRequest.onblocked = () => {
       console.warn('IndexedDB删除被阻塞，可能有其他连接')
-      resolve()
+      reject(new Error('日志数据库被其他窗口占用，请关闭旧窗口后重试'))
     }
   })
 }
@@ -1209,7 +1214,10 @@ export async function isQsoExistsInIndexedDB(fromCallsign, timestamp, toCallsign
     const store = tx.objectStore(storeName)
     const request = store.get(dedupKey)
     request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(!!request.result)
+    request.onsuccess = () => {
+      if (request.result?.timestamp === timestamp) resolve(true)
+      else getPlatform().map.hasEvidence(fromCallsign, toCallsign, timestamp).then(resolve, reject)
+    }
   })
 }
 

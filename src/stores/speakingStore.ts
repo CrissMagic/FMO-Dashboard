@@ -114,7 +114,12 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
   let listenersInstalled = false
 
   const primaryAddressId = ref<string | null>(null)
-  const primaryConnected = ref(false)
+  const primaryStatus = computed<EventsStatus>(() =>
+    primaryAddressId.value
+      ? statusMap.get(primaryAddressId.value) || 'disconnected'
+      : 'disconnected'
+  )
+  const primaryConnected = computed(() => primaryStatus.value === 'connected')
 
   let onMessageCallback: ((data: any) => void) | null = null
 
@@ -369,16 +374,13 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
 
     unsubStatus = p.events.onStatus((addressId, status) => {
       const cfg = connectionConfigs.get(addressId)
+      if (!cfg) return
       statusMap.set(addressId, status)
       changeCounter.value++
       if (status === 'connected') {
-        if (cfg?.isPrimary) primaryConnected.value = true
         startHistoryCleanup(addressId)
         if (hasNativeEvents) syncFromNativeSnapshot(addressId)
-      } else if (status === 'reconnecting') {
-        if (cfg?.isPrimary) primaryConnected.value = false
-      } else if (status === 'disconnected') {
-        if (cfg?.isPrimary) primaryConnected.value = false
+      } else if (status === 'reconnecting' || status === 'disconnected') {
         stopHistoryCleanup(addressId)
       }
     })
@@ -448,15 +450,14 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     if (!host) return
     installListeners()
     const addressId = 'single'
-    // 若已连接/连接中，忽略
-    if (statusMap.get(addressId) === 'connected') {
-      if (hasNativeEvents) syncFromNativeSnapshot(addressId)
-      return
-    }
-
+    const previous = connectionConfigs.get(addressId)
+    const sameTarget = previous?.host === host && previous?.protocol === protocol
     primaryAddressId.value = addressId
-    connectionConfigs.set(addressId, { host, protocol, isPrimary: true })
-    speakingHistoryMap.set(addressId, loadFromStorage(addressId))
+    if (!sameTarget) {
+      connectionConfigs.set(addressId, { host, protocol, isPrimary: true })
+      statusMap.set(addressId, 'connecting')
+      speakingHistoryMap.set(addressId, loadFromStorage(addressId))
+    }
 
     if (hasNativeEvents) {
       pushCachedServerNameIfAny(addressId)
@@ -485,7 +486,6 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     statusMap.delete(addressId)
 
     if (addressId === primaryAddressId.value) {
-      primaryConnected.value = false
       primaryAddressId.value = null
       if (hasNativeEvents) getPlatform().events.setPrimary('')
     }
@@ -511,6 +511,7 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     for (const addr of addresses) {
       const isPrimary = addr.id === primaryId
       connectionConfigs.set(addr.id, { host: addr.host, protocol: addr.protocol, isPrimary })
+      statusMap.set(addr.id, 'connecting')
       speakingHistoryMap.set(addr.id, loadFromStorage(addr.id))
       const { wsUrl, apiUrl } = buildWsUrl(addr.host, addr.protocol)
       getPlatform()
@@ -535,7 +536,6 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     serverInfoMap.clear()
     statusMap.clear()
 
-    primaryConnected.value = false
     primaryAddressId.value = null
     if (hasNativeEvents) getPlatform().events.setPrimary('')
     changeCounter.value++
@@ -591,7 +591,6 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     if (!cfg) return
 
     statusMap.set(id, 'reconnecting')
-    if (cfg.isPrimary) primaryConnected.value = false
     changeCounter.value++
 
     try {
@@ -617,6 +616,7 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
   return {
     // 响应式 state / computed
     primaryAddressId,
+    primaryStatus,
     primaryConnected,
     eventsConnected,
     currentSpeaker,

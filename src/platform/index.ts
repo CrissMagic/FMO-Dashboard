@@ -13,8 +13,15 @@ import type {
 import { createWebPlatform } from './web'
 import { createNativePlatform } from './native-capacitor'
 import { createIosPlatform } from './native-capacitor/ios'
+import type { IMapService } from './interfaces/IMapService'
+import type { IDeviceControlService } from './interfaces/IDeviceControlService'
+
+import type { IRelayStatusService } from './interfaces/IRelayStatusService'
 
 export interface Platform {
+  relayStatus: IRelayStatusService
+  deviceControl: IDeviceControlService
+  map: IMapService
   events: IEventsService
   audio: IAudioService
   aprs: IAprsService

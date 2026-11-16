@@ -20,6 +20,15 @@ const children = [
     redirect: '/dashboard'
   },
   {
+    path: 'map',
+    name: 'map',
+    redirect: (to) => ({
+      path: '/dashboard',
+      query: { ...to.query, view: 'footprints' },
+      hash: to.hash
+    })
+  },
+  {
     path: 'logs',
     name: 'logs',
     component: LogsView

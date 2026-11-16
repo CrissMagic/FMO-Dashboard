@@ -3,7 +3,7 @@
     <section class="control-section">
       <div class="section-header">
         <div>
-          <h2>{{ t('remote.title', 'FMO 中继控制') }}</h2>
+          <h2>{{ t('remote.title', 'FMO 设备控制') }}</h2>
           <p>{{ activeAddressLabel }}</p>
         </div>
         <button
@@ -43,6 +43,8 @@
           }}</strong>
           <span v-if="currentStation?.uid" class="uid">#{{ currentStation.uid }}</span>
         </div>
+
+        <DeviceModeControl :host="controlHost" :protocol="controlProtocol" />
 
         <div class="station-actions">
           <button class="btn-primary" :disabled="stationBusy" @click="switchPrev">
@@ -90,6 +92,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import AprsRemoteControl from '../components/home/modals/AprsRemoteControl.vue'
 import StationListModal from '../components/home/modals/StationListModal.vue'
+import DeviceModeControl from '../components/home/DeviceModeControl.vue'
 import { FmoApiClient } from '../services/fmoApi'
 import { normalizeHost } from '../utils/urlUtils'
 import { useLocale } from '../composables/useLocale'

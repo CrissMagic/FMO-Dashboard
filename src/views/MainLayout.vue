@@ -5,15 +5,32 @@
       :today-logs="todayLogs"
       :total-logs="totalLogs"
       :unique-callsigns="uniqueCallsigns"
-      :current-speaker="speakingStatus.currentSpeaker.value"
       :own-callsign="ownCallsign"
       :selected-from-callsign="selectedFromCallsign"
       :voice-mode="dashboardVoiceMode"
+      :fmo-address="settings.fmoAddress.value"
+      :protocol="settings.protocol.value"
+      :active-address-id="settings.activeAddressId.value"
+      :address-list="settings.addressList.value"
+      :current-station="speakingStatus.primaryServerInfo.value"
+      :station-connected="speakingStatus.primaryConnected.value"
+      :connection-status="speakingStatus.primaryStatus.value"
+      :station-busy="stationBusy"
       @update-voice-mode="handleUpdateDashboardVoiceMode"
+      @open-station-list="handleOpenStationList"
+      @station-prev="handleStationPrev"
+      @station-next="handleStationNext"
+      @reconnect-events="_speakingStore.reconnectEventWs()"
+    />
+
+    <WorkspaceNavigation
+      v-if="route.name !== 'dashboard'"
+      :has-unread-messages="hasUnreadMessages"
     />
 
     <!-- 发言状态条 -->
     <SpeakingBar
+      v-if="route.name !== 'dashboard'"
       :current-speaker="speakingStatus.currentSpeaker.value"
       :current-speaker-address="speakingStatus.currentSpeakerAddress.value"
       :speaking-history="speakingStatus.speakingHistory.value"
@@ -37,7 +54,7 @@
 
     <!-- 下拉刷新指示器（触摸设备，在 content-area 上方） -->
     <div
-      v-if="supportsPullToRefresh"
+      v-if="supportsPullToRefresh && route.name !== 'dashboard'"
       class="pull-refresh-indicator"
       :style="{ height: pullDistance + 'px', opacity: Math.min(pullDistance / PULL_THRESHOLD, 1) }"
     >
@@ -238,16 +255,7 @@
     <QuickNavModal :visible="showQuickNav" :db-loaded="dbLoaded" @close="showQuickNav = false" />
 
     <!-- 底部导航栏（手机端显示） -->
-    <nav class="query-nav mobile-nav">
-      <router-link v-for="route in NAV_ROUTES" :key="route.path" :to="route.path" class="nav-tab">
-        <SvgIcon :name="route.icon" :size="22" class="nav-icon" />
-        <span class="nav-label">{{ routeLabel(route) }}</span>
-        <span
-          v-if="route.type === 'messages' && hasUnreadMessages"
-          class="mobile-unread-badge"
-        ></span>
-      </router-link>
-    </nav>
+    <WorkspaceNavigation bottom :has-unread-messages="hasUnreadMessages" />
   </div>
 </template>
 
@@ -257,13 +265,13 @@ import { useRoute, useRouter } from 'vue-router'
 
 // 组件
 import AppHeader from '../components/home/AppHeader.vue'
+import WorkspaceNavigation from '../components/home/WorkspaceNavigation.vue'
 import SpeakingBar from '../components/home/SpeakingBar.vue'
 import CallsignRecordsModal from '../components/home/modals/CallsignRecordsModal.vue'
 
 import SpeakingHistoryModal from '../components/home/modals/SpeakingHistoryModal.vue'
 import StationListModal from '../components/home/modals/StationListModal.vue'
 import QuickNavModal from '../components/home/modals/QuickNavModal.vue'
-import SvgIcon from '../components/common/SvgIcon.vue'
 
 // Composables
 import { storeToRefs } from 'pinia'
@@ -298,19 +306,18 @@ import {
   pickAdifFiles,
   handleExternalLinkClick
 } from '../utils/desktopBridge'
-import { NAV_ROUTES } from '../components/home/constants'
+import { dashboardView } from '../core/navigation'
 import { getMessageService } from '../services/messageService'
 import packageInfo from '../../package.json'
 
 // 路由
 const route = useRoute()
+const isFootprintView = computed(
+  () => route.name === 'dashboard' && dashboardView(route.query) === 'footprints'
+)
 const router = useRouter()
 const appVersion = packageInfo.version
-const { isEnglish, t } = useLocale()
-
-function routeLabel(item) {
-  return isEnglish.value ? t(`nav.${item.type}`, item.label) : item.label
-}
+const { t } = useLocale()
 
 // UI 状态
 const showSpeakingHistory = ref(false)
@@ -393,6 +400,8 @@ function sendUsageStatsBeacon(reason = 'init', options = {}) {
 
 function handleTouchStart(e) {
   if (isRefreshing.value) return
+  if (route.name === 'dashboard') return
+  if (e.target?.closest?.('.contact-map-shell')) return
   // 仅当内容区滚动到顶部时触发
   if (contentAreaRef.value?.scrollTop > 0) return
   // 如果触摸目标是 range 滑块，跳过下拉刷新，让滑块正常响应
@@ -582,6 +591,7 @@ const speakingStatus = {
   primaryAddressId: _speakingRefs.primaryAddressId,
   primaryServerInfo: _speakingRefs.primaryServerInfo,
   primaryConnected: _speakingRefs.primaryConnected,
+  primaryStatus: _speakingRefs.primaryStatus,
   eventsConnected: _speakingRefs.eventsConnected,
   connectEventWs: _speakingStore.connectEventWs,
   disconnectEventWs: _speakingStore.disconnectEventWs,
@@ -1772,6 +1782,12 @@ async function handleHardwareBack({ canGoBack }) {
 
   // 2) 在仪表盘首页时，忽略历史记录栈，直接询问退出（防止退回到之前的页面）
   if (route.path === '/dashboard') {
+    if (isFootprintView.value) {
+      const query = { ...route.query }
+      delete query.view
+      router.replace({ path: '/dashboard', query })
+      return
+    }
     if (exitConfirming) return
     exitConfirming = true
     try {
@@ -2044,7 +2060,6 @@ provide('protocol', settings.protocol)
     display: none;
   }
 
-  .dashboard-route :deep(.header),
   .dashboard-route :deep(.speaking-bar) {
     display: none;
   }
@@ -2059,7 +2074,6 @@ provide('protocol', settings.protocol)
 }
 
 @media (max-width: 768px) {
-  .dashboard-route :deep(.header),
   .dashboard-route :deep(.speaking-bar) {
     display: none;
   }
@@ -2143,7 +2157,6 @@ provide('protocol', settings.protocol)
     height: 100dvh;
   }
 
-  .container :deep(.header),
   .container :deep(.speaking-bar) {
     display: none;
   }
@@ -2245,5 +2258,24 @@ provide('protocol', settings.protocol)
   to {
     transform: rotate(360deg);
   }
+}
+/* Keep both dashboard tabs inside the same viewport. */
+.dashboard-route {
+  max-width: 1600px;
+}
+.dashboard-route .content-area {
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.dashboard-route .route-frame,
+.dashboard-route .route-frame :deep(> *) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.dashboard-route .app-footer,
+.dashboard-route .back-to-top-btn {
+  display: none;
 }
 </style>

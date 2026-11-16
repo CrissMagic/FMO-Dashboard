@@ -40,6 +40,10 @@
     "win:portable:release": "bash scripts/build-windows-release.sh",
     "win:release": "bash scripts/build-windows-desktop-release.sh",
     "test:url": "node scripts/test-url-utils.mjs",
+    "test:map": "node scripts/test-footprints.mjs",
+    "test:device-control": "node scripts/test-device-control.mjs",
+    "test:events": "node scripts/test-events.mjs",
+    "test:relay-status": "node scripts/test-relay-status.mjs",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -58,6 +62,7 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "crypto-js": "^4.2.0",
     "fflate": "^0.8.3",
+    "leaflet": "^1.9.4",
     "pinia": "^3.0.4",
     "sql.js": "^1.13.0",
     "vue": "^3.5.24",
