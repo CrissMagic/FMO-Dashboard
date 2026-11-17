@@ -1,6 +1,12 @@
 name: Desktop build and signed updates
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional existing desktop-v tag to publish; leave empty for a build only'
+        required: false
+        default: ''
+        type: string
   push:
     branches: [main, codex/fmo-workspace-relay-status]
     tags: ['desktop-v*']
@@ -17,6 +23,8 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -32,13 +40,19 @@ jobs:
         id: release
         shell: pwsh
         env:
-          PUBLISH: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+          PUBLISH: ${{ startsWith(github.ref, 'refs/tags/desktop-v') || inputs.release_tag != '' }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $tag = "desktop-v$version"
           if ($env:REF_TYPE -eq 'tag' -and $env:REF_NAME -ne $tag) { throw 'Tag must match package.json version' }
+          if ($env:RELEASE_TAG -and $env:RELEASE_TAG -ne $tag) { throw 'Release tag must match package.json version' }
+          if ($env:PUBLISH -eq 'true') {
+            git show-ref --verify "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Push the existing version tag before publishing' }
+          }
           if ($env:PUBLISH -eq 'true' -and !$env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Configure TAURI_SIGNING_PRIVATE_KEY before publishing updates' }
           $signed = [bool]$env:TAURI_SIGNING_PRIVATE_KEY
           @{ bundle = @{ createUpdaterArtifacts = $signed } } | ConvertTo-Json -Compress | Set-Content src-tauri/tauri.ci.conf.json
@@ -74,6 +88,20 @@ jobs:
           prerelease: false
           includeUpdaterJson: ${{ steps.release.outputs.signed }}
           updaterJsonPreferNsis: true
+          assetNamePattern: FMO-Dashboard_[version]_[platform]_[arch][setup][ext]
+      - name: Verify published update manifest
+        if: steps.release.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: pwsh
+        run: |
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern latest.json --dir release-check --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Published release is missing latest.json' }
+          $manifest = Get-Content release-check/latest.json | ConvertFrom-Json
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $platform = $manifest.platforms.'windows-x86_64'
+          if ($manifest.version -ne $version -or !$platform.signature -or !$platform.url) { throw 'Invalid Windows update manifest' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
