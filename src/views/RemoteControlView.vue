@@ -95,6 +95,7 @@ import StationListModal from '../components/home/modals/StationListModal.vue'
 import DeviceModeControl from '../components/home/DeviceModeControl.vue'
 import { FmoApiClient } from '../services/fmoApi'
 import { normalizeHost } from '../utils/urlUtils'
+import { useRelaySwitchStore } from '../stores/relaySwitchStore'
 import { useLocale } from '../composables/useLocale'
 
 const props = defineProps({
@@ -119,7 +120,13 @@ const props = defineProps({
 const currentStation = ref(null)
 const stationList = ref([])
 const stationLoading = ref(false)
-const stationBusy = ref(false)
+const stationTaskBusy = ref(false)
+const relaySwitch = useRelaySwitchStore()
+const stationBusy = computed(
+  () =>
+    stationTaskBusy.value ||
+    relaySwitch.stateFor({ host: controlHost.value, protocol: controlProtocol.value }).busy
+)
 const stationFavoriteBusyUid = ref('')
 const showStationList = ref(false)
 const stationMessage = ref('')
@@ -181,7 +188,7 @@ async function runStationTask(task, successMessage) {
     return null
   }
 
-  stationBusy.value = true
+  stationTaskBusy.value = true
   stationError.value = false
   try {
     const result = await task(client)
@@ -197,7 +204,7 @@ async function runStationTask(task, successMessage) {
     return null
   } finally {
     client.close()
-    stationBusy.value = false
+    stationTaskBusy.value = false
   }
 }
 
@@ -210,14 +217,6 @@ async function refreshStation(options = {}) {
     if (message) setMessage(message)
   }
   if (loading) stationLoading.value = false
-  return station
-}
-
-async function refreshStationAfterSwitch(message) {
-  stationLoading.value = true
-  await wait(700)
-  const station = await refreshStation({ message, loading: false })
-  stationLoading.value = false
   return station
 }
 
@@ -249,19 +248,28 @@ async function openStationList() {
   }
 }
 
-async function selectStation(uid) {
-  const station = stationList.value.find((item) => String(item.uid) === String(uid))
-  const result = await runStationTask((client) => client.setCurrentStation(uid))
-  if (!result) return
-
-  if (station) {
-    currentStation.value = station
+async function runConfirmedSwitch(action) {
+  if (stationBusy.value) return
+  const target = { host: controlHost.value, protocol: controlProtocol.value }
+  stationError.value = false
+  setMessage('正在切换并确认中继…')
+  try {
+    const result = await relaySwitch.run(target, action)
+    if (!result || target.host !== controlHost.value || target.protocol !== controlProtocol.value)
+      return
+    currentStation.value = result.current
+    setMessage(`已切换到：${result.current.name || result.current.uid}`)
+  } catch (err) {
+    if (target.host === controlHost.value && target.protocol === controlProtocol.value)
+      setMessage(err.message || '切换中继失败', true)
   }
-  await refreshStationAfterSwitch(
-    t('remote.switchedTo', `已切换到：${station?.name || uid}`, {
-      name: station?.name || uid
-    })
-  )
+}
+function selectStation(uid) {
+  return runConfirmedSwitch({
+    type: 'select',
+    uid,
+    name: stationList.value.find((item) => String(item.uid) === String(uid))?.name
+  })
 }
 
 async function favoriteStation(station) {
@@ -296,16 +304,11 @@ async function favoriteStation(station) {
   }
 }
 
-async function switchPrev() {
-  const result = await runStationTask((client) => client.prevStation())
-  if (!result) return
-  await refreshStationAfterSwitch(t('remote.switchedPrev', '已切换到上一中继'))
+function switchPrev() {
+  return runConfirmedSwitch({ type: 'prev' })
 }
-
-async function switchNext() {
-  const result = await runStationTask((client) => client.nextStation())
-  if (!result) return
-  await refreshStationAfterSwitch(t('remote.switchedNext', '已切换到下一中继'))
+function switchNext() {
+  return runConfirmedSwitch({ type: 'next' })
 }
 
 watch(

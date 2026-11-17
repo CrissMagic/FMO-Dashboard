@@ -138,6 +138,8 @@
   --overlay-bg: rgba(0, 0, 0, 0.5);
   --tooltip-bg: #333333;
   --shadow-panel: 0 16px 40px rgba(37, 55, 66, 0.1);
+  --radius-panel: 12px;
+  --map-tile-filter: saturate(0.45) contrast(0.94);
   --surface-accent: rgba(8, 127, 196, 0.1);
   --surface-success: rgba(47, 157, 85, 0.12);
   --surface-warning: rgba(185, 112, 8, 0.12);
@@ -155,6 +157,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --map-tile-filter: invert(0.92) hue-rotate(180deg) saturate(0.35) brightness(0.85);
     /* 背景色 - 分层设计 */
     --bg-page: #111411;
     --bg-container: #181c19;
@@ -226,6 +229,7 @@
 }
 
 html[data-theme='light'] {
+  --map-tile-filter: saturate(0.45) contrast(0.94);
   color-scheme: light;
   --bg-page: #f4f7f8;
   --bg-container: #ffffff;
@@ -267,6 +271,7 @@ html[data-theme='light'] {
 }
 
 html[data-theme='dark'] {
+  --map-tile-filter: invert(0.92) hue-rotate(180deg) saturate(0.35) brightness(0.85);
   color-scheme: dark;
   --bg-page: #111411;
   --bg-container: #181c19;
@@ -384,7 +389,7 @@ h1 {
   line-height: 1.1;
 }
 
-button {
+button:where(:not([data-slot])) {
   border-radius: 8px;
   border: 1px solid var(--border-primary);
   padding: 0.6em 1.2em;
@@ -398,12 +403,12 @@ button {
     border-color 0.25s,
     background-color 0.25s;
 }
-button:hover {
+button:where(:not([data-slot])):hover {
   border-color: var(--color-primary);
   background-color: var(--bg-table-hover);
 }
-button:focus,
-button:focus-visible {
+button:where(:not([data-slot])):focus,
+button:where(:not([data-slot])):focus-visible {
   outline: none;
 }
 

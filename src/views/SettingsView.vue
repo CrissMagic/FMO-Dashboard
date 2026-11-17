@@ -11,28 +11,27 @@
               <!-- 多选同步开关 -->
               <div v-if="addressList.length > 0" class="multi-select-toggle">
                 <span class="toggle-label">{{ t('settings.multiSync', '多选同步') }}</span>
-                <label class="toggle-switch">
-                  <input
-                    id="multi-select-toggle"
-                    type="checkbox"
-                    :checked="multiSelectMode"
-                    @change="$emit('update:multiSelectMode', $event.target.checked)"
-                  />
-                  <span class="toggle-slider"></span>
-                </label>
+                <Switch
+                  id="multi-select-toggle"
+                  aria-label="多选同步"
+                  :model-value="multiSelectMode"
+                  @update:model-value="$emit('update:multiSelectMode', $event)"
+                />
               </div>
-              <button
+              <Button
                 v-if="addressList.length > 0"
+                variant="destructive"
+                size="sm"
                 class="btn-text-danger"
                 @click="handleClearAllAddresses"
               >
                 <span class="text-desktop">{{ t('settings.clearFmoAddress', '清空FMO地址') }}</span>
                 <span class="text-mobile">{{ t('settings.clear', '清空') }}</span>
-              </button>
-              <button class="btn-add" @click="showAddForm">
+              </Button>
+              <Button variant="default" size="sm" class="btn-add" @click="showAddForm">
                 <span class="text-desktop">{{ t('settings.addAddress', '+ 添加地址') }}</span>
                 <span class="text-mobile">{{ t('settings.add', '添加') }}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -89,8 +88,10 @@
               </div>
               <div class="address-actions" @click.stop>
                 <!-- 多选模式下的设为主服务器按钮 -->
-                <button
+                <Button
                   v-if="multiSelectMode && addr.id !== activeAddressId"
+                  variant="ghost"
+                  size="icon"
                   class="btn-icon"
                   :title="t('settings.setPrimary', '设为主服务器')"
                   :disabled="connectingId === addr.id"
@@ -101,9 +102,11 @@
                       d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
                   v-if="addr.id === activeAddressId"
+                  variant="ghost"
+                  size="icon"
                   class="btn-icon"
                   :class="{ 'btn-icon-loading': refreshingId === addr.id }"
                   :title="t('settings.refreshUser', '刷新用户信息')"
@@ -115,8 +118,10 @@
                       d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   class="btn-icon"
                   :title="t('settings.openFmo', '打开FMO页面')"
                   @click="openFmoPage(addr)"
@@ -126,8 +131,10 @@
                       d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   class="btn-icon"
                   :title="t('settings.edit', '编辑')"
                   @click="editAddress(addr)"
@@ -137,8 +144,10 @@
                       d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   class="btn-icon btn-icon-danger"
                   :title="t('common.delete', '删除')"
                   @click="handleDeleteAddress(addr.id)"
@@ -148,7 +157,7 @@
                       d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
                     />
                   </svg>
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -160,7 +169,7 @@
 
           <!-- 操作按钮 -->
           <div v-if="addressList.length > 0" class="setting-item-buttons">
-            <select
+            <NativeSelect
               id="sync-days"
               v-model.number="syncDays"
               class="sync-days-select"
@@ -170,8 +179,10 @@
               <option :value="3">{{ t('settings.lastDays', '最近3天', { count: 3 }) }}</option>
               <option :value="7">{{ t('settings.lastDays', '最近7天', { count: 7 }) }}</option>
               <option :value="30">{{ t('settings.lastDays', '最近30天', { count: 30 }) }}</option>
-            </select>
-            <button
+            </NativeSelect>
+            <Button
+              variant="outline"
+              size="sm"
               class="btn-secondary"
               :disabled="
                 (!fmoAddress && !(multiSelectMode && selectedAddressIds.length > 0)) || syncing
@@ -179,10 +190,12 @@
               @click="handleSyncDays"
             >
               {{ getSyncDaysButtonText }}
-            </button>
+            </Button>
           </div>
           <div v-if="addressList.length > 0" class="setting-item-buttons">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               class="btn-secondary"
               :disabled="
                 (!fmoAddress && !(multiSelectMode && selectedAddressIds.length > 0)) || syncing
@@ -190,8 +203,10 @@
               @click="handleSyncIncremental"
             >
               {{ getSyncIncrementalButtonText }}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               class="btn-secondary"
               :disabled="
                 (!fmoAddress && !(multiSelectMode && selectedAddressIds.length > 0)) || syncing
@@ -199,7 +214,7 @@
               @click="handleSyncFull"
             >
               {{ getSyncFullButtonText }}
-            </button>
+            </Button>
           </div>
           <div v-if="syncStatus" class="sync-status">
             {{ syncStatus }}
@@ -212,17 +227,14 @@
           <div class="setting-item">
             <label class="setting-label-normal">{{ t('settings.volume', '播放音量') }}</label>
             <div class="volume-control">
-              <input
-                type="range"
-                min="0"
-                max="200"
-                step="1"
-                :value="audioVolume"
-                class="volume-slider"
-                :style="{
-                  background: `linear-gradient(to right, var(--color-primary, #409eff) 0%, var(--color-primary, #409eff) ${audioVolume / 2}%, var(--border-primary) ${audioVolume / 2}%, var(--border-primary) 100%)`
-                }"
-                @input="handleVolumeChange"
+              <Slider
+                :min="0"
+                :max="200"
+                :step="1"
+                :model-value="[audioVolume]"
+                class="volume-range-control"
+                aria-label="播放音量"
+                @update:model-value="handleVolumeValue"
               />
               <span class="volume-value">{{ audioVolume }}%</span>
             </div>
@@ -230,7 +242,7 @@
           <div class="setting-item voice-test-item">
             <label class="setting-label-normal">{{ t('settings.voiceTest', '语音测试') }}</label>
             <div class="voice-test-control">
-              <input
+              <Input
                 v-model.trim="voiceTestCallsign"
                 class="voice-test-input"
                 type="text"
@@ -239,7 +251,9 @@
                 autocapitalize="characters"
                 @keyup.enter="handleVoiceTest"
               />
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 class="btn-secondary voice-test-btn"
                 :disabled="voiceTesting"
                 @click="handleVoiceTest"
@@ -249,7 +263,7 @@
                     ? t('settings.playing', '播放中...')
                     : t('settings.testVoice', '测试播报')
                 }}
-              </button>
+              </Button>
             </div>
             <div v-if="voiceTestStatus" class="voice-test-status">{{ voiceTestStatus }}</div>
           </div>
@@ -261,32 +275,60 @@
             <span class="setting-label">{{ t('settings.dataManagement', '数据管理') }}</span>
           </div>
           <div class="setting-item-data-row">
-            <button class="btn-secondary" :disabled="!dbLoaded" @click="$emit('export-data')">
+            <Button
+              variant="outline"
+              size="sm"
+              class="btn-secondary"
+              :disabled="!dbLoaded"
+              @click="$emit('export-data')"
+            >
               {{ t('settings.exportDb', '导出数据库文件') }}
-            </button>
-            <button class="btn-secondary" :disabled="!dbLoaded" @click="$emit('export-adif')">
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              class="btn-secondary"
+              :disabled="!dbLoaded"
+              @click="$emit('export-adif')"
+            >
               {{ t('settings.exportAdif', '导出ADIF') }}
-            </button>
-            <button class="btn-secondary" :disabled="!dbLoaded" @click="$emit('export-fmo-backup')">
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              class="btn-secondary"
+              :disabled="!dbLoaded"
+              @click="$emit('export-fmo-backup')"
+            >
               {{ t('settings.exportFmoBackup', '导出备份') }}
-            </button>
-            <button class="btn-primary" @click="$emit('select-files')">
+            </Button>
+            <Button variant="default" size="sm" class="btn-primary" @click="$emit('select-files')">
               {{ t('settings.importBackupToFmo', '导入备份到FMO') }}
-            </button>
+            </Button>
           </div>
           <div class="setting-item-data-row">
-            <button class="btn-tool btn-full" @click="$emit('convert-adif-to-fmo')">
+            <Button
+              variant="outline"
+              size="sm"
+              class="btn-tool btn-full"
+              @click="$emit('convert-adif-to-fmo')"
+            >
               {{ t('settings.convertAdifToFmoBackup', 'ADIF转FMO备份包工具') }}
-            </button>
+            </Button>
           </div>
           <div class="setting-item-data-clear">
             <div class="data-clear-info">
               <span class="data-clear-warning">{{
                 t('settings.clearDataWarning', '此操作将永久删除所有本地通联日志，不可恢复！')
               }}</span>
-              <button class="btn-danger" @click="$emit('clear-all-data')">
+              <Button
+                variant="destructive"
+                size="sm"
+                class="btn-danger"
+                @click="$emit('clear-all-data')"
+              >
                 {{ t('settings.clearLogs', '清空通联日志') }}
-              </button>
+              </Button>
             </div>
           </div>
           <div class="setting-item-data-clear setting-item-data-clear-mt">
@@ -294,9 +336,14 @@
               <span class="grid-cache-desc">{{
                 t('settings.clearGridCacheDesc', '清理网格地址本地缓存，下次查询将重新请求远程接口')
               }}</span>
-              <button class="btn-secondary" @click="handleClearGridCache">
+              <Button
+                variant="outline"
+                size="sm"
+                class="btn-secondary"
+                @click="handleClearGridCache"
+              >
                 {{ t('settings.clearGridCache', '清理地址缓存') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -304,20 +351,29 @@
     </div>
 
     <!-- 地址编辑弹框 -->
-    <div v-if="showAddressDialog" class="dialog-overlay" @click.self="cancelAddressDialog">
-      <div class="dialog">
-        <div class="dialog-header">
-          <span class="dialog-title">{{
+    <Dialog
+      :open="showAddressDialog"
+      @update:open="
+        (value) => {
+          if (!value) cancelAddressDialog()
+        }
+      "
+    >
+      <DialogContent class="address-editor-dialog" @close-auto-focus="restoreAddressDialogFocus">
+        <DialogHeader>
+          <DialogTitle>{{
             editingId
               ? t('settings.editAddress', '编辑地址')
               : t('settings.addAddressTitle', '添加地址')
-          }}</span>
-          <button class="close-btn" @click="cancelAddressDialog">&times;</button>
-        </div>
-        <div class="dialog-body">
+          }}</DialogTitle>
+          <DialogDescription>选择连接方式，填写 FMO 地址。</DialogDescription>
+        </DialogHeader>
+        <div class="address-form-fields">
           <div class="form-group">
-            <label class="form-label">{{ t('settings.nameOptional', '名称（可选）') }}</label>
-            <input
+            <label for="address-name" class="form-label">{{
+              t('settings.nameOptional', '名称（可选）')
+            }}</label>
+            <Input
               id="address-name"
               v-model="formData.name"
               type="text"
@@ -328,20 +384,28 @@
             />
           </div>
           <div class="form-group">
-            <label class="form-label">{{ t('settings.connectionType', '连接方式') }}</label>
-            <select id="address-type" v-model="formData.addressType" class="connection-select">
+            <label for="address-type" class="form-label">{{
+              t('settings.connectionType', '连接方式')
+            }}</label>
+            <NativeSelect
+              id="address-type"
+              v-model="formData.addressType"
+              class="connection-select"
+            >
               <option value="local">{{ t('settings.localLan', '本地IP / 局域网') }}</option>
               <option value="ddns">{{ t('settings.ddnsRemote', 'DDNS动态域名远程') }}</option>
-            </select>
+            </NativeSelect>
           </div>
           <div class="form-group">
-            <label class="form-label">{{ addressHostLabel }}</label>
-            <input
+            <label for="address-host" class="form-label">{{ addressHostLabel }}</label>
+            <Input
               id="address-host"
               v-model="formData.host"
               type="text"
               :placeholder="addressHostPlaceholder"
               class="form-input"
+              :aria-invalid="Boolean(formError)"
+              :aria-describedby="formError ? 'address-form-error' : undefined"
               inputmode="url"
               autocomplete="off"
               autocapitalize="none"
@@ -349,36 +413,56 @@
               @blur="restoreLegacyAndroidViewport"
             />
           </div>
+          <div v-if="formError" id="address-form-error" class="form-error" role="alert">
+            {{ formError }}
+          </div>
           <div v-if="!isMobileDevice" class="form-hint">
             {{ addressTypeHelpText }}
           </div>
-          <div v-if="formError" class="form-error">
-            {{ formError }}
-          </div>
         </div>
-        <div class="dialog-footer">
-          <button class="btn-secondary" :disabled="formValidating" @click="cancelAddressDialog">
+        <DialogFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            class="btn-secondary"
+            :disabled="formValidating"
+            @click="cancelAddressDialog"
+          >
             {{ t('common.cancel', '取消') }}
-          </button>
-          <button class="btn-primary" :disabled="formValidating" @click="submitAddressForm">
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            class="btn-primary"
+            :disabled="formValidating"
+            @click="submitAddressForm"
+          >
             {{
               formValidating ? t('settings.validating', '验证中...') : t('common.confirm', '确定')
             }}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <!-- FMO 页面预览弹框 -->
     <div v-if="showFmoPreview" class="dialog-overlay" @click.self="closeFmoPreview">
       <div class="fmo-preview-dialog">
         <div class="fmo-preview-toolbar">
-          <button class="btn-icon" :title="t('common.back', '上一页')" @click="fmoPreviewGoBack">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="btn-icon"
+            :title="t('common.back', '上一页')"
+            @click="fmoPreviewGoBack"
+          >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z" />
             </svg>
-          </button>
+          </Button>
           <div class="fmo-preview-toolbar-spacer"></div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             class="btn-icon"
             :title="t('common.openInBrowser', '在浏览器中打开')"
             @click="openFmoExternal"
@@ -388,8 +472,10 @@
                 d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
               />
             </svg>
-          </button>
-          <button class="close-btn" @click="closeFmoPreview">&times;</button>
+          </Button>
+          <Button variant="ghost" size="icon" class="close-btn" @click="closeFmoPreview"
+            >&times;</Button
+          >
         </div>
         <div class="fmo-preview-body">
           <iframe
@@ -408,6 +494,20 @@
 </template>
 
 <script setup>
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { NativeSelect } from '../components/ui/native-select'
+import { Switch } from '../components/ui/switch'
+import { Slider } from '../components/ui/slider'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '../components/ui/dialog'
+
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import {
@@ -760,7 +860,13 @@ function guessAddressType(host) {
   return 'ddns'
 }
 
+let addressDialogTrigger = null
+function restoreAddressDialogFocus(event) {
+  event.preventDefault()
+  if (addressDialogTrigger?.isConnected) addressDialogTrigger.focus()
+}
 function showAddForm() {
+  addressDialogTrigger = document.activeElement
   editingId.value = null
   formData.value = {
     name: '',
@@ -773,6 +879,7 @@ function showAddForm() {
 }
 
 function editAddress(addr) {
+  addressDialogTrigger = document.activeElement
   editingId.value = addr.id
   formData.value = {
     name: addr.name,
@@ -1046,8 +1153,8 @@ function getServerNumId(address, index) {
   return (index + 1).toString()
 }
 
-function handleVolumeChange(e) {
-  const value = Number(e.target.value)
+function handleVolumeValue(values) {
+  const value = Number(values[0] ?? 0)
   emit('update-audio-volume', value)
 }
 
@@ -1568,22 +1675,6 @@ async function handleVoiceTest() {
   flex-shrink: 0;
 }
 
-.btn-add {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.85rem;
-  background: var(--bg-container);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-add:hover {
-  background: var(--color-primary);
-  color: var(--text-white);
-}
-
 /* 地址列表 */
 .address-list {
   display: flex;
@@ -1669,7 +1760,7 @@ async function handleVoiceTest() {
 
 .address-url {
   font-size: 0.8rem;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-family: monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -1708,29 +1799,8 @@ async function handleVoiceTest() {
   margin-left: 0.5rem;
 }
 
-.btn-icon {
-  padding: 0.35rem;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-tertiary);
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.btn-icon:hover {
-  background: var(--bg-table-hover);
-  color: var(--color-primary);
-}
-
 .btn-icon-danger:hover {
   color: var(--color-danger);
-}
-
-.btn-icon:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .btn-icon-loading svg {
@@ -1790,56 +1860,12 @@ async function handleVoiceTest() {
   flex: 1;
 }
 
-.setting-item-buttons .sync-days-select {
+.setting-item-buttons :deep([data-slot='native-select-wrapper']) {
   flex: 1;
 }
 
 .setting-item-buttons-full .btn-ghost {
   width: 100%;
-}
-
-.sync-days-select {
-  padding: 0.5rem 0.8rem;
-  font-size: 0.9rem;
-  background: var(--bg-input);
-  color: var(--text-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  text-align: center;
-}
-
-.btn-ghost {
-  padding: 0.4rem 1rem;
-  font-size: 0.82rem;
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  letter-spacing: 0.02em;
-}
-
-.btn-ghost:hover {
-  color: var(--text-primary);
-  border-color: var(--border-secondary);
-  background: var(--bg-table-hover);
-}
-
-.btn-ghost:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.sync-days-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.sync-days-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .sync-status {
@@ -1854,87 +1880,27 @@ async function handleVoiceTest() {
   padding-top: 0;
 }
 
-.btn-primary {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  background: var(--color-primary);
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.volume-range-control {
+  flex: 1;
+  min-width: 0;
 }
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
+.address-editor-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
 }
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.address-form-fields {
+  min-width: 0;
 }
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  background: var(--bg-container);
+.address-form-fields .form-hint {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--bg-card));
   color: var(--text-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  cursor: pointer;
 }
-
-.btn-secondary:hover {
-  background: var(--bg-table-hover);
+.address-form-fields .form-group:last-of-type {
+  margin-bottom: 0;
 }
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-tool {
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  background: rgba(103, 194, 58, 0.22);
-  color: var(--color-success, #67c23a);
-  border: 1px solid rgba(103, 194, 58, 0.55);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-tool:hover {
-  background: rgba(103, 194, 58, 0.32);
-  border-color: var(--color-success, #67c23a);
-}
-
-.btn-danger {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  background: var(--color-danger);
-  color: var(--text-white);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-danger:hover {
-  background: var(--color-danger-hover);
-}
-
-.btn-text-danger {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.85rem;
-  background: none;
+.btn-icon-danger {
   color: var(--color-danger);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-text-danger:hover {
-  color: var(--color-danger-hover);
-  text-decoration: underline;
 }
 
 /* 地址编辑弹框 */
@@ -2002,18 +1968,9 @@ async function handleVoiceTest() {
 .form-input {
   width: 100%;
   min-width: 0;
-  box-sizing: border-box;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background: var(--bg-input);
-  color: var(--text-primary);
 }
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
+.form-input[aria-invalid='true'] {
+  border-color: var(--ui-destructive);
 }
 
 .form-input-flex {
@@ -2073,11 +2030,11 @@ async function handleVoiceTest() {
 .form-error {
   margin-top: 0.75rem;
   padding: 0.6rem;
-  background-color: #fef0f0;
-  border: 1px solid #fde2e2;
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--bg-card));
   border-radius: 4px;
   font-size: 0.85rem;
-  color: var(--color-danger);
+  color: color-mix(in srgb, var(--color-danger) 45%, var(--text-primary));
 }
 
 .dialog-footer {
@@ -2332,6 +2289,7 @@ async function handleVoiceTest() {
 
   .address-card {
     padding: 0.6rem 0.75rem;
+    flex-wrap: wrap;
   }
 
   .address-info {
@@ -2345,8 +2303,10 @@ async function handleVoiceTest() {
   }
 
   .address-actions {
-    margin-left: 0.25rem;
-    gap: 0.15rem;
+    margin-left: auto;
+    gap: 0.25rem;
+    justify-content: flex-end;
+    width: 100%;
   }
 
   .btn-icon {

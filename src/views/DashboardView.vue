@@ -28,11 +28,32 @@
     <div
       v-show="!showFootprints"
       id="dashboard-live-panel"
+      ref="liveStage"
       class="live-workspace"
+      :class="{ 'logs-collapsed': !logsExpanded }"
+      :style="{
+        '--live-map-bottom': `${mapToolsBottom}px`,
+        '--live-map-left': `${mapToolsLeft}px`,
+        '--live-map-status-width': `${mapStatusWidth}px`
+      }"
       role="tabpanel"
       aria-labelledby="dashboard-live-tab"
     >
-      <section class="current-contact" :class="{ 'is-idle': !activeContact }" aria-label="当前通联">
+      <LiveContactMap
+        v-if="!showFootprints"
+        :speaker="mapSpeaker"
+        :inspected="inspectedContact"
+        :self-position="fmoCoordinate"
+        :self-callsign="ownCallsign || selectedFromCallsign"
+        :padding="mapPadding"
+        @resume-live="inspectedContact = null"
+      />
+      <section
+        ref="contactPanel"
+        class="current-contact"
+        :class="{ 'is-idle': !activeContact }"
+        aria-label="当前通联"
+      >
         <div class="contact-copy">
           <div class="contact-eyebrow">
             <span
@@ -40,49 +61,79 @@
             />{{
               activeContact
                 ? activeContact.isSpeaking
-                  ? '正在通联'
-                  : '最近发言'
+                  ? '正在讲话'
+                  : stationConnected
+                    ? '守听中 · 上次听到'
+                    : '未连接 · 上次记录'
                 : stationConnected
                   ? '守听中'
                   : '未连接'
-            }}<span v-if="activeContact?.isSpeaking" class="live-text">LIVE</span>
+            }}<time v-if="activeContact" class="contact-age">{{ speakerTimeText }}</time>
           </div>
           <div class="callsign-line">
             <h1>{{ activeContact?.callsign || '等待通联' }}</h1>
-            <span v-if="activeContact?.grid" class="grid-label">{{ activeContact.grid }}</span
-            ><span v-if="activeContact?.isNewCallsign" class="new-label">新友台</span>
+            <Badge v-if="activePositionLabel" variant="secondary" class="grid-label">{{
+              activePositionLabel
+            }}</Badge>
+            <Badge v-if="activeContact?.isNewCallsign" variant="secondary" class="new-label"
+              >新友台</Badge
+            >
           </div>
           <div v-if="activeContact" class="contact-location">
-            <span>{{
+            <strong>{{
               activeContact?.qth || (activeContact ? '友台暂未提供位置' : '保持连接，等待实时通联')
-            }}</span
-            ><small v-if="activeContact && locationLabel(activeContact)">{{
-              locationLabel(activeContact)
-            }}</small
-            ><span v-if="activeContact?.hasLoggedContact"
+            }}</strong>
+          </div>
+          <div v-if="activeContact" class="location-evidence">
+            <span>{{ speakerSourceText }}</span>
+            <span v-if="activeContact.bearing"
+              >{{ activeContact.bearing.direction }} {{ activeContact.bearing.bearing }}° ·
+              {{ activeContact.bearing.distanceText }}</span
+            >
+            <span v-if="activeContact?.hasLoggedContact"
               >已通联{{
                 activeContact.contactCount ? ` · ${activeContact.contactCount} 次` : ''
               }}</span
             >
           </div>
-          <div class="contact-meta">
+          <div v-if="fmoAddress" class="contact-meta">
             <span
               >频率 / 模式 <strong>{{ currentFrequencyLine }}</strong></span
-            ><button
-              type="button"
+            ><RecentRelaySwitcher
+              v-model:open="showRecentRelaySwitcher"
+              :busy="recentRelayBusy"
               :title="recentRelayCommandTitle"
-              @click="showRecentRelaySwitcher = true"
-            >
-              最近中继 ⌄</button
-            ><button
+              @previous="switchRecentRelay('prev')"
+              @next="switchRecentRelay('next')"
+            />
+            <Button
               v-if="activeContact?.hasLoggedContact"
+              variant="link"
+              size="sm"
               type="button"
               @click="openCallsignRecords(activeContact)"
             >
               通联详情 →
-            </button>
+            </Button>
+            <Button
+              v-if="activePositionLabel"
+              variant="link"
+              size="sm"
+              aria-label="复制友台位置"
+              @click="copyActivePosition"
+              >复制位置</Button
+            >
           </div>
-          <div class="previous-line">
+          <Button
+            v-else
+            variant="outline"
+            class="connect-device"
+            type="button"
+            @click="router.push('/settings')"
+          >
+            连接 FMO 设备 →
+          </Button>
+          <div v-if="!activeContact" class="previous-line">
             <span>上次通联</span
             ><template v-if="previousContact"
               ><strong>{{ previousContact.callsign }}</strong
@@ -91,171 +142,246 @@
             ><span v-else>暂无记录</span>
           </div>
         </div>
-        <div
-          v-if="activeContact"
-          class="bearing-panel"
-          :class="{ unavailable: !activeContact?.bearing }"
-        >
-          <div class="compass">
-            <span class="north-label">N</span
-            ><svg
-              class="compass-arrow"
-              viewBox="0 0 24 32"
-              aria-hidden="true"
-              :style="{ transform: `rotate(${activeContact?.bearing?.bearing || 0}deg)` }"
-            >
-              <path d="M12 2 21 29 12 23 3 29Z" />
-            </svg>
-          </div>
-          <strong>{{
-            activeContact?.bearing
-              ? `${activeContact.bearing.direction} ${activeContact.bearing.bearing}°`
-              : '方位未知'
-          }}</strong
-          ><span>{{
-            activeContact?.bearing?.distanceText || activeContact?.bearingHint || '等待友台位置'
-          }}</span>
-        </div>
       </section>
-      <section class="live-panel" aria-label="最近通联">
-        <header class="panel-heading">
-          <div>
-            <h2>最近通联</h2>
-            <span title="统计来自已同步的本地日志；下方列表包含盒子日志和实时发言。"
-              >本地日志：今日 {{ todayLogs }} · 累计 {{ totalLogs }} · 友台
-              {{ uniqueCallsigns }}</span
+      <div class="right-overlays">
+        <aside ref="relayPanel" class="relay-inspector" aria-label="当前中继概况">
+          <Button
+            variant="ghost"
+            class="relay-inspector-heading"
+            type="button"
+            :aria-expanded="relayExpanded"
+            aria-controls="live-relay-details"
+            @click="relayExpanded = !relayExpanded"
+          >
+            <span><SvgIcon name="remoteControl" :size="17" /> 当前中继</span
+            ><span>{{ relayExpanded ? '收起 −' : '展开 ＋' }}</span>
+          </Button>
+          <div v-show="relayExpanded" id="live-relay-details" class="relay-inspector-body">
+            <strong class="inspector-name">{{ relayStation?.name || '尚未选择中继' }}</strong>
+            <p v-if="relayReport" :class="{ 'stale-report': relayStale || relayStatus.error }">
+              {{ relayAgeText }}{{ relayStale ? ' · 已过期' : '' }}
+            </p>
+            <p v-else>
+              {{
+                relayStatus.loading ? '正在读取公开广播…' : relayStatus.error || '暂无可用公开广播'
+              }}
+            </p>
+            <dl class="relay-counts">
+              <div>
+                <dt>{{ relayStale || relayStatus.error ? '上次广播在线' : '广播在线' }}</dt>
+                <dd>{{ relayReport?.online ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>历史峰值</dt>
+                <dd>{{ relayReport?.peak ?? '—' }}</dd>
+              </div>
+            </dl>
+            <dl v-if="relayReport" class="relay-facts">
+              <div>
+                <dt>管理员</dt>
+                <dd>{{ relayReport.admin || '未提供' }}</dd>
+              </div>
+              <div v-if="relayReport.rangeKm != null">
+                <dt>覆盖半径</dt>
+                <dd>{{ relayReport.rangeKm }} km</dd>
+              </div>
+              <div v-if="relayReport.host">
+                <dt>服务器</dt>
+                <dd>
+                  {{ relayReport.host }}{{ relayReport.port == null ? '' : `:${relayReport.port}` }}
+                </dd>
+              </div>
+            </dl>
+            <Button
+              variant="link"
+              size="sm"
+              class="relay-list-button"
+              type="button"
+              :disabled="!fmoAddress || stationBusy"
+              @click="emit('open-station-list')"
             >
+              选择中继 →
+            </Button>
           </div>
-          <button type="button" :disabled="refreshing" @click="refreshNow">
-            {{ refreshing ? '刷新中…' : '刷新' }}
-          </button>
-        </header>
-        <p v-if="error || refreshWarning" class="refresh-notice" role="status">
-          {{ error || refreshWarning }}
-        </p>
-        <div
-          v-if="displayRecords.length"
-          class="live-table-wrap"
-          tabindex="0"
-          aria-label="最近通联记录表格"
-        >
-          <table class="live-table">
-            <thead>
-              <tr>
-                <th>友台</th>
-                <th>时间</th>
-                <th>
-                  <span class="desktop-label">位置</span
-                  ><span class="mobile-label">位置 / 中继</span>
-                </th>
-                <th class="comment-column">留言</th>
-                <th class="mode-column">模式</th>
-                <th class="relay-column">中继</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="record in displayRecords.slice(0, 20)"
-                :key="record.rowId"
-                :class="{ 'is-speaking': record.isSpeaking }"
+        </aside>
+        <section ref="logsPanel" class="live-panel" aria-label="最近通联">
+          <header class="panel-heading">
+            <div>
+              <h2>最近通联</h2>
+              <span title="统计来自已同步的本地日志；下方列表包含盒子日志和实时发言。"
+                >本地日志：今日 {{ todayLogs }} · 累计 {{ totalLogs }} · 友台
+                {{ uniqueCallsigns }}</span
               >
-                <td>
-                  <button
-                    v-if="record.hasLoggedContact && record.toCallsign"
-                    type="button"
-                    class="callsign-link"
-                    @click="openCallsignRecords(record)"
-                  >
-                    {{ record.toCallsign }}</button
-                  ><strong v-else>{{ record.toCallsign || '—' }}</strong
-                  ><span v-if="record.isSpeaking" class="row-speaking">讲话中</span
-                  ><small>{{ record.toGrid || (record.isSelf ? '本机' : '') }}</small>
-                </td>
-                <td class="time-cell">
-                  {{ formatDatePart(record.timestamp)
-                  }}<small>{{ formatClockPart(record.timestamp) }}</small>
-                </td>
-                <td class="position-cell">
-                  {{ record.qth || '—'
-                  }}<small v-if="locationLabel(record)"
-                    >{{ locationLabel(record) }}
-                    <a
-                      v-if="aprsFiSource(record)"
-                      href="https://aprs.fi/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      >aprs.fi</a
-                    ></small
-                  ><button
-                    v-if="record.relayName"
-                    type="button"
-                    class="relay-link mobile-relay-link"
-                    :disabled="switchingRelay === record.relayName"
-                    @click="switchRelay(record.relayName)"
-                  >
-                    {{ record.relayName }}
-                  </button>
-                </td>
-                <td class="comment-column">{{ record.toComment || '—' }}</td>
-                <td class="mode-column">
-                  {{ stationIdentity(record.toCallsign).mode || record.mode || '—' }}
-                </td>
-                <td class="relay-column">
-                  <button
-                    v-if="record.relayName"
-                    type="button"
-                    class="relay-link"
-                    :disabled="switchingRelay === record.relayName"
-                    @click="switchRelay(record.relayName)"
-                  >
-                    {{ record.relayName }}</button
-                  ><span v-else>—</span
-                  ><small v-if="record.relayAdmin">{{ record.relayAdmin }}</small
-                  ><span v-if="record.isRelayPinned" class="pinned-mark" title="已收藏">★</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-else class="empty-state">
-          <strong>{{ refreshing ? '正在读取通联' : '等待实时通联' }}</strong>
-          <p>
-            {{ fmoAddress ? '新的通联会在这里实时出现。' : '先连接 FMO 盒子，开始查看实时通联。' }}
+            </div>
+            <div class="panel-actions">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                :disabled="refreshing"
+                @click="refreshNow"
+              >
+                {{ refreshing ? '刷新中…' : '刷新' }}</Button
+              ><Button
+                variant="outline"
+                size="sm"
+                type="button"
+                :aria-expanded="logsExpanded"
+                aria-controls="live-log-content"
+                @click="logsExpanded = !logsExpanded"
+              >
+                {{ logsExpanded ? '收起 −' : '展开 ＋' }}
+              </Button>
+            </div>
+          </header>
+          <p v-if="logsExpanded && (error || refreshWarning)" class="refresh-notice" role="status">
+            {{ error || refreshWarning }}
           </p>
-          <button v-if="!fmoAddress" type="button" @click="router.push('/settings')">
-            连接设备
-          </button>
-        </div>
-        <footer class="panel-footer">
-          <span>盒子日志与实时发言 · 最近 20 个友台</span><span>{{ lastRefreshText }}</span>
-        </footer>
-      </section>
-    </div>
-    <div
-      v-if="showRecentRelaySwitcher && !showFootprints"
-      class="recent-relay-switcher-overlay"
-      @click.self="showRecentRelaySwitcher = false"
-    >
-      <section class="recent-relay-switcher" aria-label="最近活跃中继">
-        <h2>最近活跃中继</h2>
-        <div>
-          <button type="button" :disabled="recentRelayBusy" @click="switchRecentRelay('prev')">
-            上个活跃中继</button
-          ><button type="button" :disabled="recentRelayBusy" @click="switchRecentRelay('next')">
-            下个活跃中继
-          </button>
-        </div>
-        <button class="relay-close" type="button" @click="showRecentRelaySwitcher = false">
-          关闭
-        </button>
-      </section>
+          <div
+            v-if="logsExpanded && displayRecords.length"
+            id="live-log-content"
+            class="live-table-wrap"
+            tabindex="0"
+            aria-label="最近通联记录表格"
+          >
+            <table class="live-table">
+              <thead>
+                <tr>
+                  <th>友台</th>
+                  <th>时间</th>
+                  <th>
+                    <span class="desktop-label">位置</span
+                    ><span class="mobile-label">位置 / 中继</span>
+                  </th>
+                  <th class="comment-column">留言</th>
+                  <th class="mode-column">模式</th>
+                  <th class="relay-column">中继</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="record in displayRecords.slice(0, 20)"
+                  :key="record.rowId"
+                  :class="{
+                    'is-speaking': record.isSpeaking,
+                    'is-map-selected': inspectedContact?.rowId === record.rowId
+                  }"
+                  tabindex="0"
+                  :aria-selected="inspectedContact?.rowId === record.rowId"
+                  :aria-label="`在地图查看 ${record.toCallsign || '此通联'} 的位置`"
+                  title="点击在地图查看位置，实时守听继续"
+                  @click="handleRecordMapClick($event, record)"
+                  @keydown.enter.self.prevent="inspectRecord(record)"
+                  @keydown.space.self.prevent="inspectRecord(record)"
+                >
+                  <td>
+                    <span class="record-identity"
+                      ><Button
+                        v-if="record.toCallsign"
+                        variant="link"
+                        size="xs"
+                        type="button"
+                        class="callsign-link"
+                        :aria-label="`在地图查看 ${record.toCallsign} 的位置`"
+                        @click.stop="inspectRecord(record)"
+                      >
+                        {{ record.toCallsign }}</Button
+                      ><strong v-else>{{ record.toCallsign || '—' }}</strong
+                      ><Button
+                        v-if="record.hasLoggedContact"
+                        variant="link"
+                        size="xs"
+                        class="record-details"
+                        :aria-label="`查看 ${record.toCallsign} 的通联详情`"
+                        @click.stop="openCallsignRecords(record)"
+                        >详情</Button
+                      ></span
+                    ><span v-if="record.isSpeaking" class="row-speaking">讲话中</span
+                    ><small>{{ record.toGrid || (record.isSelf ? '本机' : '') }}</small>
+                  </td>
+                  <td class="time-cell">
+                    {{ formatDatePart(record.timestamp)
+                    }}<small>{{ formatClockPart(record.timestamp) }}</small>
+                  </td>
+                  <td class="position-cell">
+                    {{ record.qth || '位置未提供'
+                    }}<small v-if="locationLabel(record)"
+                      >{{ locationLabel(record) }}
+                      <a
+                        v-if="aprsFiSource(record)"
+                        href="https://aprs.fi/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >aprs.fi</a
+                      ></small
+                    ><Button
+                      v-if="record.relayName"
+                      variant="link"
+                      size="xs"
+                      type="button"
+                      class="relay-link mobile-relay-link"
+                      :disabled="switchingRelay === record.relayName"
+                      @click="switchRelay(record.relayName)"
+                    >
+                      {{ record.relayName }}</Button
+                    ><small class="compact-record-detail"
+                      >{{ stationIdentity(record.toCallsign).mode || record.mode || 'FMO'
+                      }}<template v-if="record.toComment">
+                        · {{ record.toComment }}</template
+                      ></small
+                    >
+                  </td>
+                  <td class="comment-column">{{ record.toComment || '—' }}</td>
+                  <td class="mode-column">
+                    {{ stationIdentity(record.toCallsign).mode || record.mode || '—' }}
+                  </td>
+                  <td class="relay-column">
+                    <Button
+                      v-if="record.relayName"
+                      variant="link"
+                      size="xs"
+                      type="button"
+                      class="relay-link"
+                      :disabled="switchingRelay === record.relayName"
+                      @click="switchRelay(record.relayName)"
+                    >
+                      {{ record.relayName }}</Button
+                    ><span v-else>—</span
+                    ><small v-if="record.relayAdmin">{{ record.relayAdmin }}</small
+                    ><span v-if="record.isRelayPinned" class="pinned-mark" title="已收藏">★</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else-if="logsExpanded" id="live-log-content" class="empty-state">
+            <strong>{{ refreshing ? '正在读取通联' : '等待实时通联' }}</strong>
+            <p>
+              {{
+                fmoAddress ? '新的通联会在这里实时出现。' : '先连接 FMO 盒子，开始查看实时通联。'
+              }}
+            </p>
+            <Button
+              v-if="!fmoAddress"
+              variant="outline"
+              type="button"
+              @click="router.push('/settings')"
+            >
+              连接设备
+            </Button>
+          </div>
+          <footer v-if="logsExpanded" class="panel-footer">
+            <span>点击记录查看地图 · 最近 20 个友台</span><span>{{ lastRefreshText }}</span>
+          </footer>
+        </section>
+      </div>
     </div>
     <p v-if="voiceStatus" class="sr-only" role="status">{{ voiceStatus }}</p>
   </div>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Capacitor, registerPlugin } from '@capacitor/core'
@@ -275,6 +401,16 @@ import toast from '../composables/useToast'
 import { useLocale } from '../composables/useLocale'
 import WorkspaceNavigation from '../components/home/WorkspaceNavigation.vue'
 import { dashboardView } from '../core/navigation'
+import LiveContactMap from '../components/map/LiveContactMap.vue'
+import SvgIcon from '../components/common/SvgIcon.vue'
+import { speakerPosition } from '../core/speakerLocation'
+import { useRelayStatusStore } from '../stores/relayStatusStore'
+import { isRelayReportStale, relayReportAgeText } from '../core/relayStatus'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import RecentRelaySwitcher from '../components/home/RecentRelaySwitcher.vue'
+import { useMapDisplayStore } from '../stores/mapDisplayStore'
+import { formatMapPosition } from '../core/mapDisplay'
 
 const MapView = defineAsyncComponent(() => import('./MapView.vue'))
 
@@ -365,6 +501,19 @@ const fmoCoordinate = ref(null)
 const voiceStatus = ref('')
 const activeNow = ref(Date.now())
 const showRecentRelaySwitcher = ref(false)
+const liveStage = ref(null)
+const contactPanel = ref(null)
+const relayPanel = ref(null)
+const logsPanel = ref(null)
+const inspectedContact = ref(null)
+const logsExpanded = ref(true)
+const relayExpanded = ref(true)
+const mapPadding = ref({ top: 240, right: 380, bottom: 80, left: 40 })
+const mapToolsBottom = ref(80)
+const mapToolsLeft = ref(16)
+const mapStatusWidth = ref(400)
+let panelObserver = null
+let dashboardGeneration = 0
 let timer = null
 let activeTimer = null
 let audioContext = null
@@ -372,7 +521,6 @@ let removeVisibilityListener = null
 let removeAppStateListener = null
 let lastForegroundRefreshAt = 0
 const REFRESH_INTERVAL_MS = 12000
-const ACTIVE_CONTACT_LINGER_MS = 5000
 const SOFT_REFRESH_FAILURE_LIMIT = 3
 const VOICE_REPEAT_INTERVAL_MS = 10 * 60 * 1000
 const VOICE_HISTORY_KEY = 'fmo_dashboard_voice_history'
@@ -386,6 +534,50 @@ const controlHost = computed(() => controlTarget.value.host)
 const controlProtocol = computed(() => controlTarget.value.protocol)
 const speakingStatus = useSpeakingStatusStore()
 const { speakingHistory, allSpeakingHistories } = storeToRefs(speakingStatus)
+const relayStatus = useRelayStatusStore()
+const mapDisplay = useMapDisplayStore()
+const relayStation = computed(() => speakingStatus.primaryServerInfo || currentStation.value)
+const relayReport = computed(() =>
+  relayStatus.report?.uid === String(relayStation.value?.uid ?? '') ? relayStatus.report : null
+)
+const relayStale = computed(
+  () => relayReport.value && isRelayReportStale(relayReport.value, activeNow.value)
+)
+const relayAgeText = computed(() =>
+  relayReport.value ? relayReportAgeText(relayReport.value, activeNow.value) : ''
+)
+
+function measureMapSpace() {
+  const stage = liveStage.value?.getBoundingClientRect()
+  if (!stage?.width || !stage?.height) return
+  const mobile = stage.width <= 768
+  const compactWide = stage.width >= 600 && window.innerHeight <= 520
+  const contact = contactPanel.value?.getBoundingClientRect()
+  const logs = logsPanel.value?.getBoundingClientRect()
+  const relay = relayPanel.value?.getBoundingClientRect()
+  const top = compactWide
+    ? 32
+    : Math.min((contact?.bottom || stage.top) - stage.top + 32, stage.height * 0.48)
+  mapToolsBottom.value = compactWide ? 26 : mobile ? (logs?.height || 64) + 24 : 26
+  mapToolsLeft.value = compactWide ? (contact?.width || 220) + 28 : mobile ? 12 : 16
+  mapStatusWidth.value = compactWide
+    ? Math.max(170, stage.width - mapToolsLeft.value - (logs?.width || 260) - 36)
+    : 400
+  mapPadding.value = {
+    top,
+    right: compactWide
+      ? (logs?.width || 260) + 28
+      : mobile
+        ? 28
+        : Math.min((relay?.width || 340) + 48, stage.width * 0.42),
+    bottom: compactWide
+      ? Math.max(32, Math.min(100, stage.height - top - 40))
+      : mobile
+        ? Math.max(32, Math.min(mapToolsBottom.value + 76, stage.height - top - 70))
+        : 88,
+    left: compactWide ? mapToolsLeft.value : mobile ? 28 : 40
+  }
+}
 
 const lastRefreshText = computed(() => {
   if (!lastRefreshAt.value) return t('dashboard.neverRefreshed', '尚未刷新')
@@ -436,19 +628,16 @@ const currentFrequencyLine = computed(() => {
 const currentSpeakingRecord = computed(() => {
   return (
     [...speakingHistory.value]
-      .filter((item) => !item.endTime && item.callsign)
+      .filter((item) => !item.endTime && item.callsign && props.stationConnected)
       .sort((a, b) => (b.startTime || 0) - (a.startTime || 0))[0] || null
   )
 })
 
 const recentEndedSpeakingRecord = computed(() => {
-  const now = activeNow.value
   return (
     [...speakingHistory.value]
-      .filter(
-        (item) => item.endTime && item.callsign && now - item.endTime <= ACTIVE_CONTACT_LINGER_MS
-      )
-      .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))[0] || null
+      .filter((item) => item.callsign && (item.endTime || !props.stationConnected))
+      .sort((a, b) => (b.endTime || b.startTime || 0) - (a.endTime || a.startTime || 0))[0] || null
   )
 })
 
@@ -461,24 +650,74 @@ const activeContact = computed(() => {
   const qth = getRecordQth({ toCallsign: current.callsign, toGrid: grid })
   const callsign = getCallsign(current)
   const isSelf = isSelfCallsign(callsign)
-  const bearing = getBearingForGrid(grid, isSelf)
+  const position = speakerPosition(
+    { ...current, isSelf },
+    locationMetadata.value[getQthCacheKey(callsign, '')],
+    fmoCoordinate.value
+  )
+  const bearing = getBearingForPoint(position.point, isSelf)
 
   return {
     callsign,
     timestamp: Math.floor(current.startTime / 1000),
     grid,
     eventGrid: grid,
+    position,
     ...eventCoordinates(current),
     qth,
     relayName: current.serverName || matchedLog?.relayName || currentStation.value?.name || '',
     frequencySource: matchedLog || findStationByName(current.serverName) || currentStation.value,
     bearing,
     bearingHint: getBearingHint(grid, isSelf),
-    isSpeaking: !current.endTime,
+    isSpeaking: !current.endTime && props.stationConnected,
+    lastHeardAt: current.endTime || current.startTime,
     isNewCallsign: Boolean(callsign && !isSelf && getContactCount(callsign) <= 0),
     contactCount: getContactCount(callsign),
     hasLoggedContact: hasLoggedContact(callsign, matchedLog)
   }
+})
+
+const mapSpeaker = computed(() => {
+  const contact = activeContact.value
+  return contact
+    ? {
+        ...contact.position,
+        callsign: contact.callsign,
+        active: contact.isSpeaking,
+        self: isSelfCallsign(contact.callsign)
+      }
+    : null
+})
+const speakerSourceText = computed(() => {
+  const position = activeContact.value?.position
+  if (!position) return ''
+  return position.receivedAt
+    ? `${position.sourceLabel} · ${formatTimeAgo(position.receivedAt / 1000)}`
+    : position.sourceLabel
+})
+const activePositionLabel = computed(() =>
+  formatMapPosition(
+    activeContact.value?.position,
+    mapDisplay.preferences.format,
+    mapDisplay.preferences.precision
+  )
+)
+async function copyActivePosition() {
+  try {
+    await navigator.clipboard.writeText(
+      [activePositionLabel.value, speakerSourceText.value].filter(Boolean).join(' · ')
+    )
+    toast.success('已复制友台位置')
+  } catch {
+    toast.error('复制失败，请检查剪贴板权限')
+  }
+}
+const speakerTimeText = computed(() => {
+  const contact = activeContact.value
+  if (!contact) return ''
+  if (!contact.isSpeaking) return formatTimeAgo(contact.lastHeardAt / 1000)
+  const seconds = Math.max(0, Math.floor(activeNow.value / 1000 - contact.timestamp))
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 })
 
 const recentActiveRelayName = computed(() => {
@@ -555,6 +794,11 @@ const displayRecords = computed(() => {
         toGrid: grid,
         ...eventCoordinates(item),
         eventGrid: grid,
+        mapPosition: speakerPosition(
+          { ...item, isSelf: isSelfCallsign(item.callsign) },
+          locationMetadata.value[getQthCacheKey(item.callsign, '')],
+          fmoCoordinate.value
+        ),
         qth: getRecordQth({ toCallsign: item.callsign, toGrid: grid }),
         timestamp,
         toComment: item.endTime
@@ -587,6 +831,11 @@ const displayRecords = computed(() => {
     .map((record) => ({
       ...record,
       qth: getRecordQth(record),
+      mapPosition: speakerPosition(
+        { ...record, isSelf: isSelfCallsign(record.toCallsign) },
+        locationMetadata.value[getQthCacheKey(record.toCallsign, '')],
+        fmoCoordinate.value
+      ),
       rowId: `log-fill-${record.logId || record.timestamp || ''}-${record.toCallsign || ''}`,
       isRelayPinned: isRelayPinned(record.relayName),
       hasLoggedContact: hasLoggedContact(record.toCallsign, record),
@@ -689,7 +938,7 @@ function formatClockPart(timestamp) {
 
 function formatTimeAgo(timestamp) {
   if (!timestamp) return t('dashboard.noPrevious', '暂无')
-  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - timestamp))
+  const seconds = Math.max(0, Math.floor(activeNow.value / 1000 - timestamp))
   if (seconds < 60) return t('dashboard.justNow', '刚刚')
   if (seconds < 3600) {
     const count = Math.floor(seconds / 60)
@@ -1125,6 +1374,10 @@ function bearingToDirection(bearing) {
 }
 
 function getBearingForGrid(grid, isSelf = false) {
+  return getBearingForPoint(gridToLatLng(grid), isSelf)
+}
+
+function getBearingForPoint(to, isSelf = false) {
   if (isSelf) {
     return {
       bearing: 0,
@@ -1135,7 +1388,6 @@ function getBearingForGrid(grid, isSelf = false) {
   }
 
   const from = fmoCoordinate.value
-  const to = gridToLatLng(grid)
   if (!from || !to) return null
   const distance = calculateDistanceKm(from, to)
   const bearing = calculateBearing(from, to)
@@ -1608,6 +1860,38 @@ async function announceCallsign(callsign) {
   voiceStatus.value = ''
 }
 
+function handleRecordMapClick(event, record) {
+  if (event.target.closest('button, a, input, select')) return
+  inspectRecord(record)
+}
+function inspectRecord(record) {
+  const position = record.mapPosition
+  if (!position?.point) {
+    toast.warning(`${record.toCallsign || '此通联'} 未提供可定位的位置，地图保持当前位置`)
+    return
+  }
+  inspectedContact.value = {
+    ...position,
+    point: { ...position.point },
+    sourceLabel: position.source === 'self' ? '本机当前坐标' : position.sourceLabel,
+    rowId: record.rowId,
+    callsign: record.toCallsign,
+    timeText: `${formatDatePart(record.timestamp)} ${formatClockPart(record.timestamp)}`,
+    self: record.isSelf,
+    active: false
+  }
+  // Give the map a continuous visible area while keeping the selection in view.
+  if (window.innerWidth <= 768) {
+    logsExpanded.value = false
+    nextTick(() =>
+      liveStage.value?.querySelector('[aria-label="返回实时跟随"]')?.focus({ preventScroll: true })
+    )
+  }
+}
+watch(showFootprints, () => {
+  inspectedContact.value = null
+})
+
 function openCallsignRecords(record) {
   const callsign = getCallsign(record)
   if (!callsign || !hasLoggedContact(callsign, record)) return
@@ -1638,6 +1922,7 @@ function findMatchingLog(speakingRecord) {
 
 async function refreshDashboard() {
   if (refreshing.value) return
+  const generation = dashboardGeneration
 
   const client = createClient()
   if (!client) {
@@ -1658,13 +1943,11 @@ async function refreshDashboard() {
       client.getCoordinate().catch(() => null),
       allStations.value.length > 0 ? Promise.resolve(allStations.value) : client.getAllStations()
     ])
+    if (generation !== dashboardGeneration) return
     currentStation.value = station
-    if (
-      coordinate &&
-      typeof coordinate.latitude === 'number' &&
-      typeof coordinate.longitude === 'number'
-    ) {
-      fmoCoordinate.value = { lat: coordinate.latitude, lng: coordinate.longitude }
+    const point = eventCoordinates(coordinate)
+    if (point) {
+      fmoCoordinate.value = { lat: point.latitude, lng: point.longitude }
     }
     pinnedStations.value = pinnedList || []
     pinnedRelayNames.value = pinnedStations.value.map((item) => normalizeRelayName(item.name))
@@ -1685,7 +1968,7 @@ async function refreshDashboard() {
           error: err?.message || String(err)
         })
       }
-
+      if (generation !== dashboardGeneration) return
       if (index === 0) records.value = [...detailed]
     }
 
@@ -1695,6 +1978,7 @@ async function refreshDashboard() {
     refreshWarning.value = ''
     error.value = ''
   } catch (err) {
+    if (generation !== dashboardGeneration) return
     consecutiveRefreshFailures.value += 1
     const message = formatErrorMessage(err)
     const hasCachedData = records.value.length > 0 || currentStation.value || lastRefreshAt.value
@@ -1711,8 +1995,10 @@ async function refreshDashboard() {
       addDiagnosticLog('error', '仪表盘刷新失败', err)
     }
   } finally {
-    loadingStation.value = false
-    refreshing.value = false
+    if (generation === dashboardGeneration) {
+      loadingStation.value = false
+      refreshing.value = false
+    }
     client.close()
   }
 }
@@ -1754,6 +2040,26 @@ function handleAppStateChange(state) {
   if (!state?.isActive) return
   refreshAfterForeground()
 }
+
+watch(
+  () => [controlHost.value, controlProtocol.value, props.selectedFromCallsign],
+  () => {
+    dashboardGeneration++
+    inspectedContact.value = null
+    records.value = []
+    currentStation.value = null
+    fmoCoordinate.value = null
+    allStations.value = []
+    pinnedStations.value = []
+    pinnedRelayNames.value = []
+    lastRefreshAt.value = null
+    refreshing.value = false
+    error.value = ''
+    refreshWarning.value = ''
+    consecutiveRefreshFailures.value = 0
+    refreshDashboard()
+  }
+)
 
 watch(
   () => JSON.stringify(collectVisibleLocations()),
@@ -1818,23 +2124,21 @@ watch(
 
 async function switchRelay(relayName) {
   if (!relayName || switchingRelay.value) return false
+  const generation = dashboardGeneration
+  const host = props.fmoAddress
+  const protocol = props.protocol
+  const isCurrent = () =>
+    generation === dashboardGeneration && host === props.fmoAddress && protocol === props.protocol
   switchingRelay.value = relayName
-
   try {
-    const { current, station } = await switchStationByRelayName(
-      relayName,
-      props.fmoAddress,
-      props.protocol,
-      {
-        onSwitched: updateCurrentStationSnapshot
-      }
-    )
+    const { current, station } = await switchStationByRelayName(relayName, host, protocol)
+    if (!isCurrent()) return false
     updateCurrentStationSnapshot(current || station)
     refreshSpeakingSnapshot()
     toast.success(`已切换到：${current?.name || station.name}`)
     return true
   } catch (err) {
-    toast.error(err.message || '切换中继失败')
+    if (isCurrent()) toast.error(err.message || '切换中继失败')
     return false
   } finally {
     switchingRelay.value = ''
@@ -1871,6 +2175,18 @@ async function switchRecentRelay(direction) {
 }
 
 onMounted(() => {
+  if (window.matchMedia('(max-width: 768px)').matches) logsExpanded.value = false
+  if (window.matchMedia('(min-width: 769px) and (max-height: 650px)').matches) {
+    relayExpanded.value = false
+  }
+  if (typeof window.ResizeObserver !== 'undefined') {
+    panelObserver = new window.ResizeObserver(measureMapSpace)
+    for (const panel of [liveStage.value, contactPanel.value, relayPanel.value, logsPanel.value]) {
+      if (panel) panelObserver.observe(panel)
+    }
+  }
+  window.addEventListener('resize', measureMapSpace)
+  nextTick(measureMapSpace)
   refreshSpeakingSnapshot()
   refreshDashboard()
   timer = setInterval(refreshDashboard, REFRESH_INTERVAL_MS)
@@ -1891,6 +2207,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  dashboardGeneration++
+  panelObserver?.disconnect()
+  window.removeEventListener('resize', measureMapSpace)
   if (timer) clearInterval(timer)
   if (activeTimer) clearInterval(activeTimer)
   if (removeVisibilityListener) removeVisibilityListener()
@@ -1899,649 +2218,4 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-.dashboard-view {
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  color: var(--text-primary);
-}
-.dashboard-footprints-panel {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.dashboard-footprints-panel :deep(.footprint-view) {
-  flex: 1 1 0;
-  min-height: 0;
-}
-.live-workspace {
-  flex: 1 1 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 18px;
-  padding: 22px;
-  overflow: hidden;
-  animation: workspace-arrive 0.25s ease-out;
-}
-.current-contact {
-  max-height: min(320px, 44vh);
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  min-width: 0;
-  min-height: 0;
-  padding: 24px 28px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-secondary);
-  border-radius: 12px;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.current-contact.is-idle {
-  padding-block: 18px;
-}
-.current-contact.is-idle .callsign-line h1 {
-  font-size: 30px;
-  letter-spacing: -0.5px;
-}
-.current-contact.is-idle .previous-line {
-  margin-top: 14px;
-}
-.current-contact.is-idle .previous-line strong {
-  font-size: 18px;
-  font-weight: 600;
-}
-.current-contact.is-idle .previous-line time {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-.contact-copy {
-  min-width: 0;
-  flex: 1;
-}
-.contact-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.live-indicator {
-  width: 7px;
-  height: 7px;
-  background: var(--text-tertiary);
-  border-radius: 50%;
-}
-.live-indicator.speaking {
-  background: var(--color-speaking);
-  box-shadow: 0 0 0 4px var(--surface-success);
-}
-.live-indicator.error {
-  background: var(--color-danger);
-}
-.live-indicator.warning {
-  background: var(--color-warning);
-}
-.live-text {
-  font-size: 12px;
-  letter-spacing: 1px;
-  color: var(--color-success);
-}
-.callsign-line {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 12px 0 10px;
-}
-.callsign-line h1 {
-  margin: 0;
-  font-size: clamp(34px, 4.6vw, 64px);
-  font-weight: 650;
-  line-height: 1.15;
-  letter-spacing: -1.5px;
-  overflow-wrap: anywhere;
-}
-.grid-label {
-  font-size: 16px;
-  color: var(--text-secondary);
-}
-.new-label {
-  font-size: 12px;
-  background: var(--surface-accent);
-  color: var(--color-primary);
-  border-radius: 4px;
-  padding: 2px 6px;
-}
-.contact-location {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-.contact-location small {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.contact-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 22px;
-  margin-top: 16px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.contact-meta strong {
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-left: 8px;
-}
-.contact-meta button {
-  font: inherit;
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
-  padding: 0;
-  cursor: pointer;
-}
-.previous-line {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-secondary);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.previous-line strong {
-  color: var(--text-primary);
-  font-weight: 550;
-}
-.previous-line time {
-  margin-left: auto;
-  font-size: 12px;
-}
-.bearing-panel {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 5px;
-  width: 130px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.compass {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 88px;
-  height: 88px;
-  border: 1px solid var(--color-primary);
-  border-radius: 50%;
-  margin-bottom: 5px;
-  color: var(--color-primary);
-}
-.north-label {
-  position: absolute;
-  top: 3px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.compass-arrow {
-  width: 22px;
-  height: 30px;
-  fill: var(--surface-accent);
-  stroke: var(--color-primary);
-  stroke-width: 1.5;
-  transform-origin: 50% 50%;
-  transition: transform 0.35s ease-out;
-}
-.bearing-panel.unavailable .compass {
-  border-color: var(--border-primary);
-  opacity: 0.6;
-}
-.bearing-panel > span {
-  font-size: 12px;
-  text-align: center;
-  color: var(--text-secondary);
-}
-.live-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--border-secondary);
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-.panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 17px 20px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border-secondary);
-}
-.panel-heading > div {
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-.panel-heading h2 {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 0;
-}
-.panel-heading span {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.panel-heading button,
-.empty-state button {
-  border: 1px solid var(--border-secondary);
-  border-radius: 5px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
-  cursor: pointer;
-}
-.panel-heading button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.live-table-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.live-table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-.mobile-label,
-.mobile-relay-link {
-  display: none;
-}
-.live-table th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  z-index: 1;
-}
-.live-table td,
-.live-table th {
-  padding: 13px 18px;
-  border-bottom: 1px solid var(--border-secondary);
-  overflow-wrap: anywhere;
-}
-.live-table th:nth-child(1) {
-  width: 17%;
-}
-.live-table th:nth-child(2) {
-  width: 15%;
-}
-.live-table th:nth-child(3) {
-  width: 23%;
-}
-.live-table th:nth-child(4) {
-  width: 18%;
-}
-.live-table th:nth-child(5) {
-  width: 9%;
-}
-.live-table th:nth-child(6) {
-  width: 18%;
-}
-.live-table td small {
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 4px;
-}
-.live-table tr.is-speaking {
-  background: color-mix(in srgb, var(--surface-success) 55%, var(--bg-card));
-}
-.callsign-link,
-.relay-link {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--color-primary);
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-.callsign-link {
-  font-weight: 600;
-}
-.row-speaking {
-  display: inline-block;
-  margin-left: 7px;
-  font-size: 12px;
-  color: var(--color-success);
-}
-.pinned-mark {
-  font-size: 12px;
-  color: var(--color-warning);
-  margin-left: 5px;
-}
-.panel-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 9px 20px;
-  border-top: 1px solid var(--border-secondary);
-  font-size: 12px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-.refresh-notice {
-  padding: 10px 20px;
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-warning);
-  max-height: 70px;
-  overflow: auto;
-}
-.empty-state {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow: auto;
-}
-.empty-state strong {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-.empty-state p {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.7;
-  text-align: center;
-}
-.recent-relay-switcher-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay-bg);
-  z-index: 12000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
-.recent-relay-switcher {
-  width: min(390px, 100%);
-  padding: 24px;
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-.recent-relay-switcher h2 {
-  font-size: 17px;
-  margin: 0 0 20px;
-}
-.recent-relay-switcher > div {
-  display: flex;
-  gap: 12px;
-}
-.recent-relay-switcher button {
-  font: inherit;
-  font-size: 13px;
-  padding: 9px 12px;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.recent-relay-switcher .relay-close {
-  display: block;
-  margin: 18px 0 0 auto;
-  border: 0;
-  color: var(--text-secondary);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-button:focus-visible,
-[tabindex='0']:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
-}
-button {
-  transition:
-    background-color 0.16s,
-    color 0.16s,
-    transform 0.12s;
-}
-button:active:not(:disabled) {
-  transform: translateY(1px);
-}
-@keyframes workspace-arrive {
-  from {
-    opacity: 0.7;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (max-width: 1000px) {
-  .live-workspace {
-    padding: 16px;
-    gap: 14px;
-  }
-  .current-contact {
-    padding: 20px;
-    gap: 18px;
-  }
-  .bearing-panel {
-    width: 105px;
-  }
-  .live-table td,
-  .live-table th {
-    padding: 11px 13px;
-  }
-}
-@media (max-width: 768px) {
-  .live-workspace {
-    padding: 12px;
-    gap: 12px;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .current-contact {
-    padding: 18px;
-    gap: 12px;
-    align-items: flex-start;
-  }
-  .callsign-line h1 {
-    font-size: 34px;
-    letter-spacing: -1px;
-  }
-  .callsign-line {
-    gap: 7px;
-    margin-top: 12px;
-  }
-  .grid-label {
-    font-size: 12px;
-  }
-  .contact-location {
-    font-size: 13px;
-    gap: 5px 10px;
-  }
-  .contact-meta {
-    font-size: 12px;
-    gap: 8px 14px;
-    margin-top: 13px;
-  }
-  .previous-line {
-    font-size: 12px;
-    gap: 6px 10px;
-    margin-top: 15px;
-    padding-top: 12px;
-  }
-  .previous-line time {
-    margin-left: 0;
-  }
-  .bearing-panel {
-    width: 72px;
-    font-size: 12px;
-    padding-top: 22px;
-  }
-  .compass {
-    width: 62px;
-    height: 62px;
-  }
-  .compass-arrow {
-    width: 17px;
-    height: 24px;
-  }
-  .bearing-panel > span {
-    font-size: 12px;
-  }
-  .panel-heading {
-    padding: 14px 15px;
-  }
-  .panel-heading > div {
-    gap: 5px;
-  }
-  .panel-heading h2 {
-    font-size: 16px;
-    width: 100%;
-  }
-  .panel-heading span {
-    font-size: 12px;
-  }
-  .panel-footer {
-    padding: 8px 15px;
-    font-size: 12px;
-  }
-  .comment-column,
-  .mode-column,
-  .relay-column,
-  .desktop-label {
-    display: none;
-  }
-  .mobile-label {
-    display: inline;
-  }
-  .mobile-relay-link {
-    display: block;
-    margin-top: 5px;
-    line-height: 1.5;
-  }
-  .time-cell {
-    white-space: nowrap;
-  }
-  .live-table {
-    font-size: 12px;
-  }
-  .live-table th:nth-child(1) {
-    width: 25%;
-  }
-  .live-table th:nth-child(2) {
-    width: 28%;
-  }
-  .live-table th:nth-child(3) {
-    width: 47%;
-  }
-  .live-table td,
-  .live-table th {
-    padding: 10px 9px;
-  }
-  .live-table td small {
-    font-size: 12px;
-  }
-  .row-speaking {
-    display: block;
-    margin: 3px 0 0;
-    font-size: 12px;
-  }
-}
-@media (max-height: 650px) {
-  .live-workspace {
-    grid-template-rows: minmax(160px, 1fr) minmax(0, 1fr);
-    gap: 12px;
-    padding: 12px;
-  }
-  .current-contact {
-    padding: 16px 20px;
-  }
-  .callsign-line h1 {
-    font-size: 42px;
-  }
-  .contact-meta {
-    margin-top: 10px;
-  }
-  .previous-line {
-    margin-top: 12px;
-    padding-top: 10px;
-  }
-  .bearing-panel {
-    width: 94px;
-  }
-  .compass {
-    width: 64px;
-    height: 64px;
-  }
-}
-@media (max-height: 520px) {
-  .live-workspace {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    grid-template-rows: auto minmax(240px, auto);
-  }
-  .current-contact {
-    max-height: none;
-    min-height: 220px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .live-workspace {
-    animation: none;
-  }
-  button,
-  .compass-arrow {
-    transition: none;
-  }
-}
-</style>
+<style scoped src="./dashboardLive.css"></style>

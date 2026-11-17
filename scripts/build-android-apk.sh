@@ -43,8 +43,7 @@ done
 
 cd "$ROOT_DIR"
 
-export FMO_LEGACY_ANDROID="${FMO_LEGACY_ANDROID:-1}"
-echo "Android WebView legacy build: FMO_LEGACY_ANDROID=$FMO_LEGACY_ANDROID"
+echo "Android frontend requires Chrome/WebView 111+"
 
 if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" && ! -f "$ANDROID_DIR/local.properties" ]]; then
   cat >&2 <<EOF

@@ -566,6 +566,21 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     }
   }
 
+  function updateServerInfoForTarget(
+    target: { host: string; protocol?: string },
+    info: { uid: string | number; name?: string; [key: string]: any }
+  ) {
+    const host = normalizeHost(target.host).toLowerCase()
+    for (const [addressId, config] of connectionConfigs) {
+      if (
+        normalizeHost(config.host).toLowerCase() === host &&
+        config.protocol === (target.protocol || 'ws')
+      ) {
+        updateServerInfo(addressId, { ...info, uid: String(info.uid), name: info.name || '' })
+      }
+    }
+  }
+
   function setOnMessageCallback(cb: ((data: any) => void) | null) {
     onMessageCallback = cb
   }
@@ -637,6 +652,7 @@ export const useSpeakingStatusStore = defineStore('speakingStatus', () => {
     isAddressConnected,
     getServerInfo,
     updateServerInfo,
+    updateServerInfoForTarget,
     setOnMessageCallback,
     clearSpeakingHistory,
     refreshSnapshot,

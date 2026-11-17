@@ -287,7 +287,7 @@ defineEmits(['click', 'toggle-audio', 'update-voice-mode'])
 }
 
 .speaking-text strong {
-  color: var(--color-speaking);
+  color: color-mix(in srgb, var(--color-speaking) 45%, var(--text-primary));
   font-weight: 700;
   font-size: 0.92rem;
 }
@@ -410,9 +410,9 @@ defineEmits(['click', 'toggle-audio', 'update-voice-mode'])
 .contact-count {
   display: inline-flex;
   align-items: center;
-  font-size: 0.75em;
+  font-size: max(11px, 0.75em);
   font-weight: 400;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   margin-left: 0.2em;
   vertical-align: middle;
   position: relative;

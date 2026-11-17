@@ -29,6 +29,7 @@
         </svg>
         <CallsignInput
           id="search-keyword"
+          :aria-label="t('query.targetCallsign', '对方呼号')"
           :model-value="searchKeyword"
           :placeholder="t('query.targetCallsign', '对方呼号')"
           :disabled="!dbLoaded"
@@ -44,30 +45,36 @@
         />
       </div>
       <div v-if="currentQueryType === 'all'" class="quick-filters">
-        <button
+        <Button
+          :variant="activeQuickFilter === 'today' ? 'default' : 'outline'"
+          size="sm"
           class="quick-filter-chip"
           :class="{ active: activeQuickFilter === 'today' }"
           :disabled="!dbLoaded"
           @click="$emit('quickFilter', 'today')"
         >
           {{ t('common.today', '今日') }}
-        </button>
-        <button
+        </Button>
+        <Button
+          :variant="activeQuickFilter === 'week' ? 'default' : 'outline'"
+          size="sm"
           class="quick-filter-chip"
           :class="{ active: activeQuickFilter === 'week' }"
           :disabled="!dbLoaded"
           @click="$emit('quickFilter', 'week')"
         >
           {{ t('common.thisWeek', '本周') }}
-        </button>
-        <button
+        </Button>
+        <Button
+          :variant="activeQuickFilter === 'month' ? 'default' : 'outline'"
+          size="sm"
           class="quick-filter-chip"
           :class="{ active: activeQuickFilter === 'month' }"
           :disabled="!dbLoaded"
           @click="$emit('quickFilter', 'month')"
         >
           {{ t('common.thisMonth', '本月') }}
-        </button>
+        </Button>
       </div>
       <div v-if="currentQueryType === 'oldFriends'" class="search-box">
         <svg
@@ -92,7 +99,9 @@
         v-if="currentQueryType === 'oldFriends' && totalCount > 0"
         class="prioritize-chip-wrapper"
       >
-        <button
+        <Button
+          :variant="prioritizeToday ? 'default' : 'outline'"
+          size="sm"
           class="prioritize-chip"
           :class="{ active: prioritizeToday }"
           :disabled="!dbLoaded"
@@ -110,13 +119,15 @@
             <line x1="4" y1="18" x2="8" y2="18" />
           </svg>
           {{ t('query.todayContacted', '今日已通联') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { Button } from '../ui/button'
+
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -233,24 +244,8 @@ const hasFilters = computed(() => {
 }
 
 .search-box :deep(input) {
-  padding: 0.4rem 0.8rem 0.4rem 1.8rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  font-size: 0.9rem;
+  padding-left: 1.8rem;
   width: 135px;
-  height: 32px;
-  box-sizing: border-box;
-  background: var(--bg-input);
-  color: var(--text-primary);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.search-box :deep(input:focus) {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--shadow-primary);
 }
 
 .date-filter {
@@ -265,80 +260,15 @@ const hasFilters = computed(() => {
   align-items: center;
 }
 
-.quick-filter-chip {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 14px;
-  background: var(--bg-container);
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s;
-  font-family: inherit;
-  line-height: 1.5;
-}
-
-.quick-filter-chip:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--bg-primary-light);
-}
-
-.quick-filter-chip.active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.quick-filter-chip:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .prioritize-chip-wrapper {
   display: flex;
   align-items: center;
-}
-
-.prioritize-chip {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 14px;
-  background: var(--bg-container);
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s;
-  font-family: inherit;
-  line-height: 1.5;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
 }
 
 .prioritize-chip .sort-icon {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-
-.prioritize-chip:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--bg-primary-light);
-}
-
-.prioritize-chip.active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.prioritize-chip:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
@@ -363,7 +293,7 @@ const hasFilters = computed(() => {
 
   .search-box :deep(input) {
     width: 100%;
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
 
   .date-filter {

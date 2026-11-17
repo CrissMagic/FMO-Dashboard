@@ -24,12 +24,113 @@ const geometry = await load('mapGeometry')
 const footprint = await load('footprints')
 const { coordinatesToMaidenhead } = await load('maidenhead')
 const { frequencyText } = await load('stationDetails')
+const { speakerPosition } = await load('speakerLocation')
+const mapDisplay = await load('mapDisplay')
 let checks = 0
 function check(name, callback) {
   callback()
   checks++
   console.log(`PASS ${name}`)
 }
+
+check('Live map keeps transmission evidence separate from last-known APRS positions', () => {
+  const aprs = { latitude: 39.9, longitude: 116.4, receivedAt: Date.now() - 3600000 }
+  const exact = speakerPosition(
+    { callsign: 'N1DEMO', latitude: 29.5, longitude: 106.5, grid: 'OL29' },
+    aprs
+  )
+  assert.equal(exact.source, 'coordinates')
+  assert.deepEqual(exact.point, { lat: 29.5, lng: 106.5 })
+  assert.equal(speakerPosition({ callsign: 'N1DEMO', grid: 'OL29' }, aprs).source, 'grid')
+  const previous = speakerPosition({ callsign: 'N1DEMO' }, aprs)
+  assert.equal(previous.source, 'aprs')
+  assert.equal(previous.receivedAt, aprs.receivedAt)
+  assert.equal(speakerPosition({ callsign: 'AI-DEMO' }, aprs).point, null)
+  assert.equal(speakerPosition({ callsign: 'N2DEMO' }).point, null)
+  assert.equal(speakerPosition({ callsign: 'N2DEMO', grid: 'INVALID', latitude: NaN }).point, null)
+  assert.equal(speakerPosition({ callsign: 'N2DEMO' }, { ...aprs, receivedAt: NaN }).point, null)
+  assert.equal(
+    speakerPosition({ callsign: 'N0DEMO', isSelf: true }, aprs, { lat: 0, lng: 0 }).source,
+    'self'
+  )
+})
+
+check('Map format changes preserve packet grid precision and WGS84 coordinates', () => {
+  const position = speakerPosition({ callsign: 'N1DEMO', grid: 'OL39' })
+  assert.equal(mapDisplay.formatMapPosition(position, 'maidenhead', 8), 'OL39')
+  assert.match(mapDisplay.formatMapPosition(position, 'coordinates'), /^网格中心约 /)
+  assert.equal(
+    mapDisplay.formatMapPosition({ point: { lat: 0, lng: 0 } }, 'coordinates'),
+    '0.0000°N  0.0000°E'
+  )
+  assert.equal(mapDisplay.formatMapPosition({ point: { lat: NaN, lng: 0 } }, 'coordinates'), '')
+  for (const point of [
+    { lat: 29.56, lng: 106.55 },
+    { lat: 39.9, lng: 116.4 },
+    { lat: -33.8, lng: 151.2 }
+  ]) {
+    const original = mapDisplay.fromMapPoint(geometry.toMapPoint(point))
+    assert.ok(
+      Math.abs(original.lat - point.lat) < 1e-7 && Math.abs(original.lng - point.lng) < 1e-7
+    )
+  }
+})
+
+check('Viewport grids bound work at world, pole, dateline and fine local scales', () => {
+  for (const bounds of [
+    { south: -85, north: 85, west: -210, east: 210 },
+    { south: 29, north: 31, west: 105, east: 108 },
+    { south: -10, north: 10, west: 170, east: -170 }
+  ]) {
+    for (const mode of ['coordinates', 'maidenhead']) {
+      const grid = mapDisplay.buildViewportGrid(bounds, mode, 8, 4)
+      assert.ok(grid.lines.length > 0 && grid.lines.length < 160)
+      assert.ok(grid.labels.length <= 64)
+      assert.ok(
+        grid.lines.every((line) =>
+          line.points.every((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+        )
+      )
+    }
+  }
+  const local = mapDisplay.buildViewportGrid(
+    { south: 29.56, north: 29.57, west: 106.55, east: 106.56 },
+    'maidenhead',
+    8,
+    16
+  )
+  assert.equal(local.precision, 8)
+  assert.equal(local.reduced, false)
+  assert.ok(local.labels.every((label) => label.text.length === 8))
+  const wide = mapDisplay.buildViewportGrid(
+    { south: 20, north: 40, west: 100, east: 120 },
+    'maidenhead',
+    8,
+    4
+  )
+  assert.equal(wide.reduced, true)
+  assert.deepEqual(
+    mapDisplay.buildViewportGrid({ south: 0, north: 1, west: 0, east: 1 }, 'none', 'auto', 4).lines,
+    []
+  )
+})
+
+check('Saved map display choices normalize safely without changing shared defaults', () => {
+  assert.deepEqual(
+    mapDisplay.normalizeMapDisplay({
+      background: 'none',
+      grid: 'coordinates',
+      format: 'coordinates',
+      precision: 8
+    }),
+    { background: 'none', grid: 'coordinates', format: 'coordinates', precision: 8 }
+  )
+  assert.deepEqual(
+    mapDisplay.normalizeMapDisplay({ background: 'bad', grid: {}, format: null, precision: '8' }),
+    mapDisplay.DEFAULT_MAP_DISPLAY
+  )
+  assert.equal(mapDisplay.DEFAULT_MAP_DISPLAY.background, 'detailed')
+})
 
 check('Maidenhead centers round-trip at all supported precisions', () => {
   for (const point of [

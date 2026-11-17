@@ -101,8 +101,10 @@
               </template>
               <template v-else-if="col === 'relayName'">
                 <div class="relay-cell">
-                  <button
+                  <Button
                     v-if="row.relayName"
+                    variant="link"
+                    size="xs"
                     class="relay-link"
                     :disabled="switchingRelay === row.relayName"
                     :title="
@@ -111,7 +113,7 @@
                     @click.stop="handleRelaySwitch(row.relayName)"
                   >
                     {{ row.relayName }}
-                  </button>
+                  </Button>
                   <div v-else>-</div>
                   <div class="relay-admin">（{{ row.relayAdmin }}）</div>
                 </div>
@@ -157,6 +159,8 @@
 </template>
 
 <script setup>
+import { Button } from '../ui/button'
+
 /* global IntersectionObserver */
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { ColumnNames, formatTimestamp, formatFreqHz, isTodayContact } from './constants'
@@ -221,20 +225,21 @@ let tableDragMoved = false
 
 async function handleRelaySwitch(relayName) {
   if (!relayName || switchingRelay.value) return
+  const host = props.fmoAddress
+  const protocol = props.protocol
+  const isCurrent = () => host === props.fmoAddress && protocol === props.protocol
   switchingRelay.value = relayName
 
   try {
-    const { current, station } = await switchStationByRelayName(
-      relayName,
-      props.fmoAddress,
-      props.protocol
-    )
+    const { current, station } = await switchStationByRelayName(relayName, host, protocol)
+    if (!isCurrent()) return
     toast.success(
       t('remote.switchedTo', `已切换到：${current?.name || station.name}`, {
         name: current?.name || station.name
       })
     )
   } catch (err) {
+    if (!isCurrent()) return
     toast.error(err.message || t('remote.switchFailed', '切换中继失败'))
   } finally {
     switchingRelay.value = ''
@@ -512,7 +517,7 @@ function formatTimePart(dateTimeStr) {
 }
 
 .relay-admin {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -567,7 +572,7 @@ function formatTimePart(dateTimeStr) {
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   background: var(--bg-secondary);
   line-height: 1.2;
   display: inline-flex;
@@ -670,7 +675,7 @@ function formatTimePart(dateTimeStr) {
 
 .empty-row .empty-cell {
   text-align: center;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   padding: 3rem 1rem;
 }
 
@@ -702,7 +707,7 @@ function formatTimePart(dateTimeStr) {
 .empty-desc {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 /* 滚动加载提示 */
@@ -710,7 +715,7 @@ function formatTimePart(dateTimeStr) {
   display: none;
   text-align: center;
   padding: 1rem;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 

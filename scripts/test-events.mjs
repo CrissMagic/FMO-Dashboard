@@ -359,6 +359,59 @@ const tests = [
       assert.equal(store.isAddressConnected('a'), true)
       assert.equal(store.isAddressConnected('b'), true)
     }
+  ],
+  [
+    'Relay confirmation from an old target cannot overwrite a replacement connection',
+    async () => {
+      setup()
+      const store = useSpeakingStatusStore()
+      store.connectEventWs('one.invalid', 'ws')
+      newest().open()
+      await flush()
+      store.connectEventWs('two.invalid', 'ws')
+      newest().open()
+      await flush()
+      const before = store.primaryServerInfo
+      store.updateServerInfoForTarget(
+        { host: 'one.invalid', protocol: 'ws' },
+        { uid: 'old-result', name: '旧盒子中继' }
+      )
+      assert.deepEqual(store.primaryServerInfo, before)
+      store.updateServerInfoForTarget(
+        { host: 'two.invalid', protocol: 'ws' },
+        { uid: 777, name: '新盒子中继' }
+      )
+      assert.equal(store.primaryServerInfo.uid, '777')
+    }
+  ],
+  [
+    'Relay synchronization updates matching secondary boxes without changing the primary',
+    async () => {
+      setup()
+      const store = useSpeakingStatusStore()
+      store.connectMultipleEventWs(
+        [
+          { id: 'a', host: 'one.invalid', protocol: 'ws' },
+          { id: 'b', host: 'two.invalid', protocol: 'ws' }
+        ],
+        'b'
+      )
+      await flush()
+      Socket.all.forEach((socket) => socket.open())
+      await flush()
+      const before = store.primaryServerInfo
+      store.updateServerInfoForTarget(
+        { host: 'ONE.invalid', protocol: 'ws' },
+        { uid: 'secondary', name: '副盒子中继' }
+      )
+      assert.equal((await store.getServerInfo('a')).uid, 'secondary')
+      assert.deepEqual(store.primaryServerInfo, before)
+      store.updateServerInfoForTarget(
+        { host: 'one.invalid', protocol: 'wss' },
+        { uid: 'wrong-protocol', name: '' }
+      )
+      assert.equal((await store.getServerInfo('a')).uid, 'secondary')
+    }
   ]
 ]
 let failures = 0

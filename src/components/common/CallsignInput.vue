@@ -1,9 +1,17 @@
 <template>
-  <input :value="modelValue" type="text" v-bind="filteredAttrs" @input="handleInput" />
+  <input
+    data-slot="input"
+    :class="inputStyles"
+    :value="modelValue"
+    type="text"
+    v-bind="filteredAttrs"
+    @input="handleInput"
+  />
 </template>
 
 <script setup>
 import { computed, useAttrs } from 'vue'
+import { inputStyles } from '../ui/input'
 
 defineOptions({
   inheritAttrs: false

@@ -14,6 +14,7 @@ import {
   shouldShowLegacyAndroidNotice
 } from './utils/androidCompatibility'
 import './style.css'
+import './styles/ui.css'
 
 installDiagnosticLog()
 

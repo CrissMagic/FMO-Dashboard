@@ -1,8 +1,11 @@
 <template>
   <div v-if="totalPages >= 1" class="pagination">
-    <button
+    <Button
+      variant="outline"
+      size="icon"
       :disabled="disabled || currentPage === 1"
       class="page-btn nav-btn"
+      aria-label="首页"
       @click="$emit('page-change', 1)"
     >
       <svg
@@ -16,10 +19,13 @@
         <polyline points="11 17 6 12 11 7" />
         <polyline points="18 17 13 12 18 7" />
       </svg>
-    </button>
-    <button
+    </Button>
+    <Button
+      variant="outline"
+      size="icon"
       :disabled="disabled || currentPage === 1"
       class="page-btn"
+      aria-label="上一页"
       @click="$emit('page-change', currentPage - 1)"
     >
       <svg
@@ -32,12 +38,13 @@
       >
         <polyline points="15 18 9 12 15 6" />
       </svg>
-    </button>
+    </Button>
     <div class="page-info">
-      <input
+      <Input
         type="number"
+        aria-label="跳转页码"
         class="page-jump-input"
-        :value="currentPage"
+        :model-value="currentPage"
         :min="1"
         :max="totalPages"
         :disabled="disabled"
@@ -52,9 +59,12 @@
         }}</span>
       </template>
     </div>
-    <button
+    <Button
+      variant="outline"
+      size="icon"
       :disabled="disabled || currentPage === totalPages || totalPages === 0"
       class="page-btn"
+      aria-label="下一页"
       @click="$emit('page-change', currentPage + 1)"
     >
       <svg
@@ -67,10 +77,13 @@
       >
         <polyline points="9 18 15 12 9 6" />
       </svg>
-    </button>
-    <button
+    </Button>
+    <Button
+      variant="outline"
+      size="icon"
       :disabled="disabled || currentPage === totalPages || totalPages === 0"
       class="page-btn nav-btn"
+      aria-label="末页"
       @click="$emit('page-change', totalPages)"
     >
       <svg
@@ -84,11 +97,14 @@
         <polyline points="13 17 18 12 13 7" />
         <polyline points="6 17 11 12 6 7" />
       </svg>
-    </button>
+    </Button>
   </div>
 </template>
 
 <script setup>
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+
 import { useLocale } from '../../composables/useLocale'
 
 const props = defineProps({
@@ -137,34 +153,6 @@ function handleJump(event) {
   min-height: 50px;
 }
 
-.page-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--border-primary);
-  background: var(--bg-container);
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  color: var(--text-secondary);
-  transition: all 0.15s;
-}
-
-.page-btn:hover:not(:disabled) {
-  background: var(--bg-table-hover);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.page-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
 .page-info {
   display: flex;
   align-items: center;
@@ -175,16 +163,10 @@ function handleJump(event) {
 }
 
 .page-jump-input {
-  width: 42px;
-  height: 30px;
+  width: 50px;
+  height: 40px;
   text-align: center;
-  font-size: 0.9rem;
   font-weight: 600;
-  font-family: inherit;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  background: var(--bg-input);
-  color: var(--text-primary);
   padding: 0 0.2rem;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -195,12 +177,6 @@ function handleJump(event) {
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
-}
-
-.page-jump-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--shadow-primary);
 }
 
 .page-jump-input:disabled {

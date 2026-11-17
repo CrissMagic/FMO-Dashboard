@@ -178,20 +178,21 @@ function getQrzUrl(callsign) {
 
 async function handleRelaySwitch(relayName) {
   if (!relayName || switchingRelay.value) return
+  const host = props.fmoAddress
+  const protocol = props.protocol
+  const isCurrent = () => host === props.fmoAddress && protocol === props.protocol
   switchingRelay.value = relayName
 
   try {
-    const { current, station } = await switchStationByRelayName(
-      relayName,
-      props.fmoAddress,
-      props.protocol
-    )
+    const { current, station } = await switchStationByRelayName(relayName, host, protocol)
+    if (!isCurrent()) return
     toast.success(
       t('remote.switchedTo', `已切换到：${current?.name || station.name}`, {
         name: current?.name || station.name
       })
     )
   } catch (err) {
+    if (!isCurrent()) return
     toast.error(err.message || t('remote.switchFailed', '切换中继失败'))
   } finally {
     switchingRelay.value = ''

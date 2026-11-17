@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import pluginVue from 'eslint-plugin-vue'
 import prettier from 'eslint-plugin-prettier/recommended'
+import tsParser from '@typescript-eslint/parser'
 
 export default [
   js.configs.recommended,
@@ -40,6 +41,19 @@ export default [
       'vue/multi-word-component-names': 'off',
       'vue/no-mutating-props': 'off'
     }
+  },
+  {
+    files: [
+      'src/components/ui/**/*.vue',
+      'src/components/map/MapDisplaySettings.vue',
+      'src/components/home/RecentRelaySwitcher.vue'
+    ],
+    languageOptions: { parserOptions: { parser: tsParser } }
+  },
+  {
+    // Headless primitives inherit optional prop defaults from Reka UI.
+    files: ['src/components/ui/**/*.vue'],
+    rules: { 'vue/require-default-prop': 'off' }
   },
   {
     ignores: [

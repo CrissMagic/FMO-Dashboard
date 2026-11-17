@@ -16,6 +16,7 @@
       :station-connected="speakingStatus.primaryConnected.value"
       :connection-status="speakingStatus.primaryStatus.value"
       :station-busy="stationBusy"
+      :station-list-open="showStationList"
       @update-voice-mode="handleUpdateDashboardVoiceMode"
       @open-station-list="handleOpenStationList"
       @station-prev="handleStationPrev"
@@ -290,6 +291,7 @@ import {
   closeTopModal
 } from '../composables/useModalBackHandler'
 import toast from '../composables/useToast'
+import { useRelaySwitchStore } from '../stores/relaySwitchStore'
 import confirmDialog from '../composables/useConfirm'
 import { useLocale } from '../composables/useLocale'
 import {
@@ -514,7 +516,12 @@ const stationListFetchedAt = ref(cachedStations.fetchedAt)
 const stationFavoriteBusyUid = ref('')
 
 // Station 状态
-const stationBusy = ref(false)
+const relaySwitch = useRelaySwitchStore()
+const stationBusy = computed(
+  () =>
+    relaySwitch.stateFor({ host: settings.fmoAddress.value, protocol: settings.protocol.value })
+      .busy
+)
 
 // 消息未读状态
 const hasUnreadMessages = computed(() => {
@@ -721,61 +728,38 @@ function createStationClient() {
   return new FmoApiClient(fullAddress)
 }
 
-async function handleStationPrev() {
+async function runRelaySwitch(action) {
   if (stationBusy.value) return
-  const client = createStationClient()
-  if (!client) return
-
-  stationBusy.value = true
+  const primaryId = speakingStatus.primaryAddressId.value
+  const target = { host: settings.fmoAddress.value, protocol: settings.protocol.value }
   try {
-    await client.connect()
-    const result = await client.prevStation()
-    if (result?.result === 0) {
-      const primaryId = speakingStatus.primaryAddressId.value
-      if (primaryId) {
-        await speakingStatus.getServerInfo(primaryId, true)
-      }
-    }
+    const result = await relaySwitch.run(target, action)
+    if (
+      !result ||
+      primaryId !== speakingStatus.primaryAddressId.value ||
+      target.host !== settings.fmoAddress.value ||
+      target.protocol !== settings.protocol.value
+    )
+      return
+    toast.success(`已切换到：${result.current.name || result.current.uid}`)
   } catch (err) {
-    console.error('切换上一个服务器失败:', err)
-  } finally {
-    try {
-      client.close()
-    } catch (closeErr) {
-      console.error('关闭客户端连接失败:', closeErr)
-    }
-    stationBusy.value = false
+    if (
+      primaryId === speakingStatus.primaryAddressId.value &&
+      target.host === settings.fmoAddress.value &&
+      target.protocol === settings.protocol.value
+    )
+      toast.error(err.message || '切换中继失败')
   }
 }
-
-async function handleStationNext() {
-  if (stationBusy.value) return
-  const client = createStationClient()
-  if (!client) return
-
-  stationBusy.value = true
-  try {
-    await client.connect()
-    const result = await client.nextStation()
-    if (result?.result === 0) {
-      const primaryId = speakingStatus.primaryAddressId.value
-      if (primaryId) {
-        await speakingStatus.getServerInfo(primaryId, true)
-      }
-    }
-  } catch (err) {
-    console.error('切换下一个服务器失败:', err)
-  } finally {
-    try {
-      client.close()
-    } catch (closeErr) {
-      console.error('关闭客户端连接失败:', closeErr)
-    }
-    stationBusy.value = false
-  }
+function handleStationPrev() {
+  return runRelaySwitch({ type: 'prev' })
+}
+function handleStationNext() {
+  return runRelaySwitch({ type: 'next' })
 }
 
 function handleOpenStationList() {
+  if (stationBusy.value) return
   showStationList.value = true
   const expired =
     !stationListFetchedAt.value || Date.now() - stationListFetchedAt.value > 60 * 60 * 1000
@@ -861,37 +845,9 @@ async function handleStationFavorite(station) {
   }
 }
 
-async function handleStationSelect(uid) {
-  if (stationBusy.value) return
-  const client = createStationClient()
-  if (!client) return
-
-  stationBusy.value = true
-  try {
-    await client.connect()
-    const result = await client.setCurrentStation(uid)
-    if (result?.result === 0) {
-      const primaryId = speakingStatus.primaryAddressId.value
-      if (primaryId) {
-        const selectedStation = stationList.value.find(
-          (station) => String(station.uid) === String(uid)
-        )
-        if (selectedStation) {
-          speakingStatus.updateServerInfo(primaryId, selectedStation)
-        }
-        await speakingStatus.getServerInfo(primaryId, true)
-      }
-    }
-  } catch (err) {
-    console.error('设置当前服务器失败:', err)
-  } finally {
-    try {
-      client.close()
-    } catch (closeErr) {
-      console.error('关闭客户端连接失败:', closeErr)
-    }
-    stationBusy.value = false
-  }
+function handleStationSelect(uid) {
+  const station = stationList.value.find((item) => String(item.uid) === String(uid))
+  return runRelaySwitch({ type: 'select', uid, name: station?.name })
 }
 
 // 回到顶部 - 带防抖的滚动处理

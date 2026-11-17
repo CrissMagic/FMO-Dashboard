@@ -14,35 +14,57 @@
         ><i />{{ connectionLabel }}</span
       >
     </div>
-    <div class="relay-controls" aria-label="当前中继控制">
+    <div class="relay-controls" aria-label="当前中继控制" :aria-busy="relayBusy">
       <button
         class="relay-step"
         type="button"
         aria-label="上一中继"
-        :disabled="!stationConnected || stationBusy"
+        :disabled="!stationConnected || relayBusy"
         @click="emit('station-prev')"
       >
-        ‹
+        <ChevronLeft :size="18" aria-hidden="true" />
       </button>
       <button
         class="relay-name"
+        :class="{
+          'is-switching': relayBusy,
+          'has-switch-feedback': relaySwitchLabel !== '当前中继'
+        }"
         type="button"
-        :disabled="!fmoAddress || stationBusy"
-        :title="station?.name || '选择中继'"
+        :disabled="!fmoAddress || relayBusy"
+        :title="
+          relayBusy || relaySwitchState.phase === 'error'
+            ? relaySwitchState.message
+            : station?.name || '选择中继'
+        "
+        aria-haspopup="dialog"
+        :aria-expanded="stationListOpen"
         @click="emit('open-station-list')"
       >
-        <small>当前中继</small
-        ><strong>{{ station?.name || (fmoAddress ? '选择中继' : '连接设备') }}</strong
-        ><span>⌄</span>
+        <small
+          :class="{ 'relay-switch-error': relaySwitchState.phase === 'error' }"
+          role="status"
+          >{{ relaySwitchLabel }}</small
+        ><strong>{{
+          relayBusy
+            ? relaySwitchState.targetName || station?.name || '请稍候'
+            : station?.name || (fmoAddress ? '选择中继' : '连接设备')
+        }}</strong
+        ><LoaderCircle
+          v-if="relayBusy"
+          class="relay-switch-spinner"
+          :size="18"
+          aria-hidden="true"
+        /><ChevronDown v-else :size="18" aria-hidden="true" />
       </button>
       <button
         class="relay-step"
         type="button"
         aria-label="下一中继"
-        :disabled="!stationConnected || stationBusy"
+        :disabled="!stationConnected || relayBusy"
         @click="emit('station-next')"
       >
-        ›
+        <ChevronRight :size="18" aria-hidden="true" />
       </button>
     </div>
     <button
@@ -272,6 +294,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLocale } from '../../composables/useLocale'
+import { ChevronDown, ChevronLeft, ChevronRight, LoaderCircle } from '@lucide/vue'
+import { useRelaySwitchStore } from '../../stores/relaySwitchStore'
 import { useRelayStatusStore } from '../../stores/relayStatusStore'
 import { isRelayReportStale, relayReportAgeText } from '../../core/relayStatus'
 import { useMapStore } from '../../stores/mapStore'
@@ -296,7 +320,8 @@ const props = defineProps({
   currentStation: { type: Object, default: null },
   stationConnected: Boolean,
   connectionStatus: { type: String, default: '' },
-  stationBusy: Boolean
+  stationBusy: Boolean,
+  stationListOpen: Boolean
 })
 const emit = defineEmits([
   'update-voice-mode',
@@ -308,6 +333,21 @@ const emit = defineEmits([
 const router = useRouter()
 const mapStore = useMapStore()
 const relayStatus = useRelayStatusStore()
+const relaySwitch = useRelaySwitchStore()
+const relaySwitchState = computed(() =>
+  relaySwitch.stateFor({ host: props.fmoAddress, protocol: props.protocol })
+)
+const relayBusy = computed(() => props.stationBusy || relaySwitchState.value.busy)
+const relaySwitchLabel = computed(() => {
+  if (relayBusy.value) return relaySwitchState.value.phase === 'confirming' ? '确认中…' : '切换中…'
+  if (relaySwitchState.value.phase === 'error') return '切换未确认'
+  if (
+    relaySwitchState.value.phase === 'success' &&
+    String(relaySwitchState.value.confirmed?.uid) === String(station.value?.uid)
+  )
+    return '已切换'
+  return '当前中继'
+})
 const relayNow = ref(Date.now())
 let relayTimer
 const connectionLabel = computed(
@@ -534,6 +574,44 @@ i {
   white-space: nowrap;
   flex: 1;
   font-weight: 550;
+}
+.relay-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.relay-name > svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.relay-name.has-switch-feedback small {
+  display: inline;
+  color: var(--text-secondary);
+}
+.relay-name.is-switching:disabled {
+  opacity: 1;
+  cursor: wait;
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-card));
+  border-radius: 6px;
+}
+.relay-name.is-switching > svg {
+  color: var(--color-primary);
+}
+.relay-name small.relay-switch-error {
+  color: color-mix(in srgb, var(--color-danger) 45%, var(--text-primary));
+}
+.relay-switch-spinner {
+  animation: relay-switch-spin 1s linear infinite;
+}
+@keyframes relay-switch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .relay-switch-spinner {
+    animation: none;
+  }
 }
 .relay-name > span {
   color: var(--text-tertiary);

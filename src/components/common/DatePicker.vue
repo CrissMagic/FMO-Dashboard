@@ -1,8 +1,23 @@
 <template>
   <div class="date-picker">
-    <div class="date-picker-trigger" @click="toggleCalendar">
-      <span class="trigger-text" :class="{ placeholder: !selectedDate }">{{ displayText }}</span>
-      <span v-if="selectedDate" class="clear-btn" @click.stop="clearDate">×</span>
+    <div class="date-picker-trigger">
+      <Button
+        variant="outline"
+        class="date-picker-open"
+        :aria-expanded="showCalendar"
+        @click="toggleCalendar"
+      >
+        <span class="trigger-text" :class="{ placeholder: !selectedDate }">{{ displayText }}</span>
+      </Button>
+      <Button
+        v-if="selectedDate"
+        variant="ghost"
+        size="icon"
+        class="clear-btn"
+        aria-label="清除筛选日期"
+        @click="clearDate"
+        >×</Button
+      >
     </div>
 
     <div v-if="showCalendar" class="calendar-popup">
@@ -53,6 +68,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { Button } from '../ui/button'
 import { getMonthlyContactStatsFromIndexedDB } from '../../services/db'
 import { useLocale } from '../../composables/useLocale'
 
@@ -275,34 +291,19 @@ onUnmounted(() => {
 }
 
 .date-picker-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  white-space: nowrap;
+  position: relative;
   min-width: 110px;
-  height: 32px;
-  box-sizing: border-box;
 }
-
-.date-picker-trigger:hover {
-  border-color: var(--color-primary);
+.date-picker-open {
+  width: 100%;
+  justify-content: flex-start;
+  padding-right: 40px;
 }
-
 .clear-btn {
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.clear-btn:hover {
-  color: var(--color-danger);
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .trigger-text.placeholder {

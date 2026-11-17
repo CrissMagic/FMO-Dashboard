@@ -1,0 +1,84 @@
+/* Prefix and scoped base rules allow incremental migration without resetting old pages or Leaflet. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme) prefix(tw);
+@import 'tailwindcss/utilities.css' layer(utilities) prefix(tw) source(none);
+@import 'tw-animate-css';
+@source '../';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --ui-action-foreground: #fff;
+  --ui-destructive: #bf3038;
+}
+html[data-theme='dark'] {
+  --ui-action-foreground: #06283c;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='light']) {
+    --ui-action-foreground: #06283c;
+  }
+}
+
+@theme inline {
+  --color-background: var(--bg-card);
+  --color-foreground: var(--text-primary);
+  --color-card: var(--bg-card);
+  --color-card-foreground: var(--text-primary);
+  --color-popover: var(--bg-card);
+  --color-popover-foreground: var(--text-primary);
+  --color-primary: var(--color-primary-hover);
+  --color-primary-foreground: var(--ui-action-foreground);
+  --color-secondary: var(--bg-page);
+  --color-secondary-foreground: var(--text-primary);
+  --color-muted: var(--bg-page);
+  --color-muted-foreground: var(--text-secondary);
+  --color-accent: color-mix(in srgb, var(--color-primary) 10%, var(--bg-card));
+  --color-accent-foreground: var(--color-primary);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-foreground: #fff;
+  --color-border: var(--border-primary);
+  --color-input: var(--border-primary);
+  --color-ring: var(--color-primary);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: var(--radius-panel);
+  --radius-xl: 16px;
+}
+
+@layer base {
+  [data-slot] {
+    box-sizing: border-box;
+    border-style: solid;
+    border-width: 0;
+    border-color: var(--border-primary);
+  }
+  [data-slot='dialog-title'],
+  [data-slot='dialog-description'],
+  [data-slot='sheet-title'],
+  [data-slot='sheet-description'] {
+    margin: 0;
+  }
+  input[data-slot] {
+    cursor: text;
+  }
+  button[data-slot] {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+  }
+  button[data-slot],
+  input[data-slot],
+  select[data-slot] {
+    font-family: inherit;
+  }
+  button[data-slot],
+  select[data-slot] {
+    cursor: pointer;
+  }
+  button[data-slot]:disabled {
+    cursor: not-allowed;
+  }
+}

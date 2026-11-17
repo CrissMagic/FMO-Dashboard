@@ -1,4 +1,5 @@
 import { FmoApiClient } from './fmoApi'
+import { useRelaySwitchStore } from '../stores/relaySwitchStore'
 import { normalizeHost } from '../utils/urlUtils'
 
 const DEFAULT_CONTROL_HOST = '192.168.31.146'
@@ -58,20 +59,10 @@ export async function switchStationByRelayName(
     throw new Error('请先设置 FMO 控制地址')
   }
 
-  const client = new FmoApiClient(`${target.protocol}://${target.host}`)
-
-  try {
-    const station = await findStationByRelayName(client, relayName)
-
-    await client.setCurrentStation(station.uid)
-    options.onSwitched?.(station)
-    await wait(700)
-
-    const current = await client.getCurrentStation()
-    return { station, current }
-  } finally {
-    client.close()
-  }
+  const result = await useRelaySwitchStore().run(target, { type: 'name', name: relayName })
+  if (!result) throw new Error('中继正在切换，请稍候')
+  options.onSwitched?.(result.current)
+  return result
 }
 
 export async function addStationToPinnedByRelayName(relayName, host = '', protocol = 'ws') {

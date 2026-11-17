@@ -1,5 +1,7 @@
 # FMO 仪表盘
 
+当前开发版本的界面统一使用 shadcn-vue 与 Tailwind CSS 4，浏览器支持基线为 Chrome/Edge/WebView 111+、Safari/WKWebView 16.4+、Firefox 128+。Android 设备需要符合该 WebView 要求；旧版本发布记录中的低内核兼容范围不适用于当前开发版本。
+
 FMO 仪表盘是面向 FMO 用户的实时通联看板，基于 FmoLogs 数据与 FMO WebSocket 接口增强而来。它把常用信息放在第一屏：当前发言、最近通联、友台位置、相对方位、距离、服务器状态、播报模式和通联统计。
 
 仪表盘（`/dashboard`，默认入口）内可通过 Tab 切换实时通联和通联足迹。足迹地址为 `/dashboard?view=footprints`，旧的 `/map` 自动跳转。各页面共用主导航，支持从其他菜单直接返回足迹；仪表盘 Tab 来回切换会保留地图和筛选状态。

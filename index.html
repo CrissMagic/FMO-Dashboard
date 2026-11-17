@@ -82,7 +82,7 @@
       var chromeMatch = ua.match(/(?:Chrome|CriOS)\/(\d+)/i)
       var chromeMajor = chromeMatch ? Number(chromeMatch[1]) : null
       var lacksModule = !('noModule' in document.createElement('script'))
-      var tooOld = isAndroid && ((chromeMajor && chromeMajor < 61) || (!chromeMajor && lacksModule))
+      var tooOld = isAndroid && ((chromeMajor && chromeMajor < 111) || (!chromeMajor && lacksModule))
       if (tooOld) document.documentElement.className += ' legacy-webview'
       window.__FMO_ANDROID_WEBVIEW_PRECHECK__ = {
         isAndroid: isAndroid,
@@ -91,10 +91,7 @@
         tooOld: tooOld
       }
       window.__FMO_SHOULD_IGNORE_STARTUP_ERROR__ = function (message) {
-        if (!isAndroid || !chromeMajor || chromeMajor >= 64) return false
-        return /Unexpected token|Unexpected reserved word|Unexpected identifier/i.test(
-          message || ''
-        )
+        return false
       }
       window.__FMO_SHOW_STARTUP_FALLBACK__ = function (reason) {
         var root = document.documentElement
@@ -158,8 +155,8 @@
     </div>
   </noscript>
   <div class="legacy-webview-fallback" role="alert">
-    <h1>当前 Android WebView 无法稳定启动</h1>
-    <p>当前设备的 WebView/Chrome 内核太旧或厂商 ROM 兼容性不足，可能无法启动 FMO仪表盘 V2.05，容易出现白屏、闪退或同步异常。</p>
+    <h1>当前浏览器内核无法稳定启动</h1>
+    <p>当前版本需要 Chrome/WebView 111+、Safari 16.4+ 或 Firefox 128+。请升级浏览器内核后重新打开 FMO仪表盘。</p>
     <p>请先在应用市场升级 <code>Android System WebView</code> 或 <code>Chrome</code>，再重新打开本应用。</p>
     <p>如果车机系统无法升级 WebView，建议改用 Android 10+ 设备、网页版或桌面版。</p>
     <p id="legacy-startup-reason"></p>
