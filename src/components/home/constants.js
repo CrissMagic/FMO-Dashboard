@@ -32,6 +32,13 @@ const aboutRoute = {
 // 更多页面内的子路由（"自动定位"位于"关于"之前，仅原生定位平台有此项）
 export const MORE_ROUTES = [
   {
+    path: '/updates',
+    label: '软件更新',
+    type: 'updates',
+    icon: 'download',
+    description: '检查新版本、下载并安装更新'
+  },
+  {
     path: '/top20',
     label: '排行榜',
     type: 'top20',

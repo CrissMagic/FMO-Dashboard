@@ -73,6 +73,7 @@ const children = [
     name: 'friendLinks',
     component: FriendLinksView
   },
+  { path: 'updates', name: 'updates', component: () => import('../views/UpdateView.vue') },
   {
     path: 'about',
     name: 'about',

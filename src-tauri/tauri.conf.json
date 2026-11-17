@@ -60,7 +60,9 @@
       },
       "nsis": {
         "installerIcon": "icons/icon.ico",
-        "languages": ["SimpChinese"],
+        "languages": [
+          "SimpChinese"
+        ],
         "displayLanguageSelector": false
       }
     },
@@ -85,7 +87,21 @@
         "bundleMediaFramework": false
       },
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERCOTRFN0JGNTRCRDk0MjkKUldRcGxMMVV2K2VVMjJ5WHZjRFpPMUFWTlQyUjhqNjE0ZHFNTm13ZVBta0l0UEozNVNCSWVFWnIK",
+      "endpoints": [
+        "https://github.com/CrissMagic/FMO-Dashboard/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

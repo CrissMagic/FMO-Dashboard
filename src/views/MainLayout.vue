@@ -1855,7 +1855,7 @@ provide('protocol', settings.protocol)
 .container {
   width: 100%;
   min-width: 0;
-  max-width: 1400px;
+  max-width: none;
   margin: 0 auto;
   padding: 0;
   display: flex;
@@ -2217,7 +2217,7 @@ provide('protocol', settings.protocol)
 }
 /* Keep both dashboard tabs inside the same viewport. */
 .dashboard-route {
-  max-width: 1600px;
+  max-width: none;
 }
 .dashboard-route .content-area {
   padding: 0;

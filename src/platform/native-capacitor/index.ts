@@ -1,3 +1,4 @@
+import { WebUpdateService } from '../web/UpdateService.web'
 import { WebRelayStatusService } from '../web/RelayStatusService.web'
 import type { Platform } from '../index'
 import { nativeCapabilities } from './Capabilities.native'
@@ -14,6 +15,7 @@ import { WebDeviceControlService } from '../web/DeviceControlService.web'
 
 export function createNativePlatform(): Platform {
   return {
+    updates: new WebUpdateService(),
     relayStatus: new WebRelayStatusService(),
     deviceControl: new WebDeviceControlService(),
     map: new WebMapService(),

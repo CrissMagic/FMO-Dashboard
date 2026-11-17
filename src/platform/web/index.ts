@@ -1,3 +1,4 @@
+import { WebUpdateService } from './UpdateService.web'
 import { WebRelayStatusService } from './RelayStatusService.web'
 import type { Platform } from '../index'
 import { webCapabilities } from './Capabilities.web'
@@ -14,6 +15,7 @@ import { WebDeviceControlService } from './DeviceControlService.web'
 
 export function createWebPlatform(): Platform {
   return {
+    updates: new WebUpdateService(),
     relayStatus: new WebRelayStatusService(),
     deviceControl: new WebDeviceControlService(),
     map: new WebMapService(),

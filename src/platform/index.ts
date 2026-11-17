@@ -18,7 +18,10 @@ import type { IDeviceControlService } from './interfaces/IDeviceControlService'
 
 import type { IRelayStatusService } from './interfaces/IRelayStatusService'
 
+import type { IUpdateService } from './interfaces/IUpdateService'
+
 export interface Platform {
+  updates: IUpdateService
   relayStatus: IRelayStatusService
   deviceControl: IDeviceControlService
   map: IMapService

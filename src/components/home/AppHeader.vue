@@ -123,6 +123,7 @@
             <button type="button" @click="toggleLocale">
               {{ isEnglish ? '语言：简体中文' : '语言：English' }}
             </button>
+            <button type="button" @click="openUpdates">检查软件更新</button>
             <div class="public-tools"><PublicSiteTools /></div>
             <p>
               本地日志：今日 {{ todayLogs }} · 累计 {{ totalLogs }} · 友台 {{ uniqueCallsigns }}
@@ -331,6 +332,10 @@ const emit = defineEmits([
   'reconnect-events'
 ])
 const router = useRouter()
+function openUpdates() {
+  toolsOpen.value = false
+  router.push('/updates')
+}
 const mapStore = useMapStore()
 const relayStatus = useRelayStatusStore()
 const relaySwitch = useRelaySwitchStore()

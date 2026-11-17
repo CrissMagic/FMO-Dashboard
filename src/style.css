@@ -457,7 +457,7 @@ button:where(:not([data-slot])):focus-visible {
   height: 100dvh;
   box-sizing: border-box;
   overflow-x: hidden;
-  max-width: 1400px;
+  max-width: none;
   margin: 0 auto;
   padding: 0;
   /* Android：由 FmoSystemUi 插件设置 CSS 变量；iOS/Web：使用 env(safe-area-inset-*) */

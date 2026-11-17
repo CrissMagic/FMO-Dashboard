@@ -2,7 +2,7 @@
   "name": "fmo-dashboard",
   "private": true,
   "license": "MIT",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -45,7 +45,8 @@
     "test:events": "node scripts/test-events.mjs",
     "test:relay-status": "node scripts/test-relay-status.mjs",
     "typecheck": "vue-tsc --noEmit",
-    "test:relay-switch": "node scripts/test-relay-switch.mjs"
+    "test:relay-switch": "node scripts/test-relay-switch.mjs",
+    "test:updates": "node scripts/test-updates.mjs"
   },
   "dependencies": {
     "@anuradev/capacitor-background-mode": "^7.2.1",
@@ -58,10 +59,11 @@
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
     "@lucide/vue": "^1.73.0",
-    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/api": "~2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-updater": "~2.12.0",
     "@vueuse/core": "^15.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
